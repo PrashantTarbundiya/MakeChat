@@ -85,31 +85,31 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
         isOpen ? 'translate-x-0' : '-translate-x-full'
       } w-64 flex flex-col`}>
         <div className="h-[50px]"></div>
-        <div className="p-4 border-b border-gray-700 space-y-2">
+        <div className="p-3 sm:p-4 border-b border-gray-700 space-y-2">
           <button
             onClick={onNewChat}
-            className="w-full flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+            className="w-full flex items-center gap-2 px-3 sm:px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-sm"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-4 sm:w-5 h-4 sm:h-5" />
             New Chat
           </button>
           <button
             onClick={() => setSearchOpen(!searchOpen)}
-            className="w-full flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+            className="w-full flex items-center gap-2 px-3 sm:px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-sm"
           >
-            <Search className="w-5 h-5" />
+            <Search className="w-4 sm:w-5 h-4 sm:h-5" />
             Search
           </button>
           <button
             onClick={() => setModelsOpen(!modelsOpen)}
-            className="w-full flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+            className="w-full flex items-center gap-2 px-3 sm:px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-sm"
           >
-            <Sparkles className="w-5 h-5" />
+            <Sparkles className="w-4 sm:w-5 h-4 sm:h-5" />
             Models
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2">
           {user.id === 'guest' ? (
             <div className="text-gray-400 text-sm text-center py-4">
               Login to save chat history
@@ -138,7 +138,7 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
                       <MessageSquare className="w-4 h-4 flex-shrink-0" />
                       <span className="truncate text-sm">{chat.title}</span>
                     </button>
-                    <button onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === chat._id ? null : chat._id); }} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/10 rounded">
+                    <button onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === chat._id ? null : chat._id); }} className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1 hover:bg-white/10 rounded">
                       <MoreVertical className="w-4 h-4" />
                     </button>
                     {menuOpen === chat._id && (
@@ -182,13 +182,13 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
           )}
         </div>
 
-        <div className="p-4 border-t border-gray-700">
+        <div className="p-3 sm:p-4 border-t border-gray-700">
           {user.id === 'guest' ? (
             <div className="space-y-2">
-              <a href="/login" className="w-full block text-center px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors text-white">
+              <a href="/login" className="w-full block text-center px-3 sm:px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors text-white text-sm">
                 Login
               </a>
-              <a href="/signup" className="w-full block text-center px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-white">
+              <a href="/signup" className="w-full block text-center px-3 sm:px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-white text-sm">
                 Sign Up
               </a>
             </div>
@@ -221,9 +221,9 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
 
       {searchOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => setSearchOpen(false)}>
-          <div className="bg-[#1F2023] rounded-lg p-6 w-[600px] h-[500px] mx-4 flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-[#1F2023] rounded-lg p-4 sm:p-6 w-full max-w-[600px] max-h-[85vh] mx-4 flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white">Search Chats</h3>
+              <h3 className="text-base sm:text-lg font-semibold text-white">Search Chats</h3>
               <button onClick={() => setSearchOpen(false)} className="text-gray-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
@@ -234,7 +234,7 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Type to search..."
-              className="w-full px-4 py-2 bg-white/10 rounded-lg text-white placeholder-gray-400 outline-none mb-4"
+              className="w-full px-3 sm:px-4 py-2 bg-white/10 rounded-lg text-white placeholder-gray-400 outline-none mb-4 text-sm"
             />
             <div className="flex-1 overflow-y-auto space-y-2 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
               {chats.filter(chat => chat.title.toLowerCase().includes(searchQuery.toLowerCase())).map(chat => (
@@ -254,14 +254,14 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
 
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-          <div className="bg-[#2A2B2E] rounded-lg p-6 max-w-sm mx-4">
-            <h3 className="text-lg font-semibold mb-2">Delete Chat?</h3>
-            <p className="text-gray-400 text-sm mb-4">This action cannot be undone.</p>
+          <div className="bg-[#2A2B2E] rounded-lg p-4 sm:p-6 max-w-sm mx-4">
+            <h3 className="text-base sm:text-lg font-semibold mb-2 text-white">Delete Chat?</h3>
+            <p className="text-gray-400 text-xs sm:text-sm mb-4">This action cannot be undone.</p>
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg">
+              <button onClick={() => setDeleteConfirm(null)} className="px-3 sm:px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm text-white">
                 Cancel
               </button>
-              <button onClick={() => deleteChat(deleteConfirm)} className="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg">
+              <button onClick={() => deleteChat(deleteConfirm)} className="px-3 sm:px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg text-sm text-white">
                 Delete
               </button>
             </div>

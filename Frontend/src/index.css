@@ -6,6 +6,13 @@ body {
   background-color: #000000;
   margin: 0;
   padding: 0;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+#root {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 ::-webkit-scrollbar {
@@ -24,4 +31,10 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #2a2a2a;
+}
+
+@supports (padding: env(safe-area-inset-bottom)) {
+  .pb-safe {
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+  }
 }

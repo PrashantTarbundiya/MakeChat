@@ -11,10 +11,10 @@ export const ModelsModal = ({ isOpen, onClose, onSelectModel }) => {
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={onClose}>
-      <div className="bg-[#1F2023] rounded-lg p-6 w-[600px] h-[500px] mx-4 flex flex-col" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-[#1F2023] rounded-lg p-4 sm:p-6 w-full max-w-[600px] max-h-[85vh] mx-auto flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white">Media Generation Models</h3>
+          <h3 className="text-base sm:text-lg font-semibold text-white">Media Generation Models</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-white">
             <X className="w-5 h-5" />
           </button>
@@ -27,10 +27,10 @@ export const ModelsModal = ({ isOpen, onClose, onSelectModel }) => {
                 onSelectModel(model.id);
                 onClose();
               }}
-              className="w-full flex flex-col gap-1 px-4 py-3 hover:bg-white/10 rounded-lg text-left transition-colors"
+              className="w-full flex flex-col gap-1 px-3 sm:px-4 py-2 sm:py-3 hover:bg-white/10 rounded-lg text-left transition-colors"
             >
-              <span className="text-base text-white font-medium">{model.name}</span>
-              <span className="text-sm text-gray-400">{model.desc}</span>
+              <span className="text-sm sm:text-base text-white font-medium">{model.name}</span>
+              <span className="text-xs sm:text-sm text-gray-400">{model.desc}</span>
             </button>
           ))}
         </div>

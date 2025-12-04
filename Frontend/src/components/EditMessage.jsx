@@ -12,12 +12,12 @@ export const EditMessage = ({ value, onChange, onSave, onCancel, role, onRemoveF
   
   return (
     <div className="space-y-2">
-      <div className={`rounded-2xl px-4 py-3 ${
+      <div className={`rounded-2xl px-3 sm:px-4 py-2 sm:py-3 ${
         role === 'user' ? 'bg-white text-black' : 'bg-[#1F2023] text-white'
       }`}>
         {imageMatch && (
           <div className="relative inline-block mb-2">
-            <img src={imageMatch[1]} alt="Uploaded" className="rounded-lg" style={{width: '150px', height: '100px', objectFit: 'cover'}} />
+            <img src={imageMatch[1]} alt="Uploaded" className="rounded-lg max-w-full" style={{maxWidth: '150px', height: 'auto', objectFit: 'cover'}} />
             <button
               onClick={() => {
                 onChange(textOnly);
@@ -70,13 +70,13 @@ export const EditMessage = ({ value, onChange, onSave, onCancel, role, onRemoveF
       <div className="flex gap-2">
         <button
           onClick={onSave}
-          className="px-3 py-1 bg-white text-black rounded-lg text-sm"
+          className="px-3 py-1.5 bg-white text-black rounded-lg text-xs sm:text-sm"
         >
           Save
         </button>
         <button
           onClick={onCancel}
-          className="px-3 py-1 bg-white/20 text-white rounded-lg text-sm"
+          className="px-3 py-1.5 bg-white/20 text-white rounded-lg text-xs sm:text-sm"
         >
           Cancel
         </button>

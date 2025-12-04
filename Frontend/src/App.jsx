@@ -20,7 +20,7 @@ function App({ user, isShared = false }) {
   const [editText, setEditText] = useState('');
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [currentChatId, setCurrentChatId] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 1024);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [thinkingPanel, setThinkingPanel] = useState(null);
   const [loadingState, setLoadingState] = useState('');
@@ -382,7 +382,7 @@ function App({ user, isShared = false }) {
   }, [messages, currentResponse, currentChatId, user, selectedModel]);
 
   return (
-    <div className="flex w-full h-screen bg-black">
+    <div className="flex w-full h-screen bg-black overflow-hidden">
       <Toaster position="top-center" toastOptions={{ style: { background: '#1F2023', color: '#fff' } }} />
       <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       <Sidebar
@@ -396,13 +396,13 @@ function App({ user, isShared = false }) {
         setIsOpen={setSidebarOpen}
         onOpenSettings={() => setSettingsOpen(true)}
       />
-      <div className={`flex flex-col flex-1 transition-all duration-300 ${sidebarOpen ? 'lg:ml-64' : 'ml-0'} ${thinkingPanel !== null ? 'lg:mr-[300px]' : ''}`}>
-      <div className="flex-1 overflow-y-auto p-2 sm:p-4 pt-[66px] scrollbar-thin scrollbar-thumb-black scrollbar-track-black">
+      <div className={`flex flex-col flex-1 transition-all duration-300 ${sidebarOpen ? 'lg:ml-64' : 'ml-0'} ${thinkingPanel !== null ? 'lg:mr-[300px]' : ''} h-screen`}>
+      <div className="flex-1 overflow-y-auto p-2 sm:p-4 pt-[50px] pb-2 scrollbar-thin scrollbar-thumb-black scrollbar-track-black">
         <div className="max-w-[900px] mx-auto space-y-4">
           {messages.length === 0 && !isLoading && (
-            <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+            <div className="flex items-center justify-center min-h-[60vh]">
               <div className="text-center px-4">
-                <h1 className="text-2xl sm:text-4xl font-bold text-white mb-4">
+                <h1 className="text-2xl sm:text-3xl font-bold text-white mb-3">
                   {[
                     `Hello, ${user.name}! 👋`,
                     `Welcome back, ${user.name}! ✨`,
@@ -416,7 +416,7 @@ function App({ user, isShared = false }) {
                     `Hello! I'm here to help! 💡`
                   ][Math.floor(Math.random() * 10)]}
                 </h1>
-                <p className="text-gray-400 text-sm sm:text-lg">Start a conversation or ask me anything</p>
+                <p className="text-gray-400 text-sm sm:text-base">Start a conversation or ask me anything</p>
               </div>
             </div>
           )}
@@ -507,7 +507,7 @@ function App({ user, isShared = false }) {
           <div ref={messagesEndRef} />
         </div>
       </div>
-      <div className={`p-2 sm:p-4 w-full mx-auto transition-all duration-300 ${thinkingPanel !== null ? 'max-w-[700px]' : 'max-w-[800px]'}`}>
+      <div className={`p-2 sm:p-3 w-full mx-auto transition-all duration-300 ${thinkingPanel !== null ? 'max-w-[700px]' : 'max-w-[800px]'} pb-safe`}>
         <PromptInputBox 
           onSend={handleSendMessage} 
           isLoading={isLoading} 
@@ -518,6 +518,7 @@ function App({ user, isShared = false }) {
       </div>
       </div>
       {thinkingPanel !== null && messages[thinkingPanel]?.thinking && (
+        <>
         <div className="fixed right-0 top-0 h-full w-full sm:w-[300px] bg-[#1F2023] border-l border-gray-700 shadow-2xl z-50 flex flex-col">
           <div className="flex items-center justify-between p-4 border-b border-gray-700">
             <h3 className="text-white font-semibold flex items-center gap-2">
@@ -538,6 +539,13 @@ function App({ user, isShared = false }) {
             </div>
           </div>
         </div>
+        {window.innerWidth < 640 && (
+          <div
+            onClick={() => setThinkingPanel(null)}
+            className="fixed inset-0 bg-black/50 z-40"
+          />
+        )}
+        </>
       )}
       <Settings user={user} isOpen={settingsOpen} setIsOpen={setSettingsOpen} onLogout={handleLogout} />
     </div>
