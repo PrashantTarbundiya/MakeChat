@@ -343,11 +343,11 @@ function App({ user, isShared = false }) {
   }, [isShared]);
 
   useEffect(() => {
-    if (messages.length > 0 && !isShared) {
+    if (messages.length > 0 && !isShared && !isLoading) {
       const timer = setTimeout(() => saveChat(), 1000);
       return () => clearTimeout(timer);
     }
-  }, [messages, currentResponse, isLoading, isShared]);
+  }, [messages, isShared]);
 
   useEffect(() => {
     const scrollToBottom = () => {
@@ -362,24 +362,13 @@ function App({ user, isShared = false }) {
 
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (messages.length > 0 && user?.id !== 'guest') {
-        const messagesToSave = currentResponse 
-          ? [...messages, { role: 'assistant', content: currentResponse + ' [Incomplete]', model: selectedModel }]
-          : messages;
-        navigator.sendBeacon(
-          `${import.meta.env.VITE_API_URL}/api/chat/save`,
-          JSON.stringify({
-            token: localStorage.getItem('token'),
-            chatId: currentChatId,
-            messages: messagesToSave,
-            title: messages[0]?.content.slice(0, 50) || 'New Chat'
-          })
-        );
+      if (messages.length > 0 && user?.id !== 'guest' && !isShared) {
+        saveChat();
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [messages, currentResponse, currentChatId, user, selectedModel]);
+  }, [messages, currentChatId, user, isShared]);
 
   return (
     <div className="flex w-full h-screen bg-black overflow-hidden">
@@ -397,7 +386,7 @@ function App({ user, isShared = false }) {
         onOpenSettings={() => setSettingsOpen(true)}
       />
       <div className={`flex flex-col flex-1 transition-all duration-300 ${sidebarOpen ? 'lg:ml-64' : 'ml-0'} ${thinkingPanel !== null ? 'lg:mr-[300px]' : ''} h-screen`}>
-      <div className="flex-1 overflow-y-auto p-2 sm:p-4 pt-[50px] pb-2 scrollbar-thin scrollbar-thumb-black scrollbar-track-black">
+      <div className="flex-1 overflow-y-auto p-2 sm:p-4 pt-[58px] pb-[90px] scrollbar-thin scrollbar-thumb-black scrollbar-track-black">
         <div className="max-w-[900px] mx-auto space-y-4">
           {messages.length === 0 && !isLoading && (
             <div className="flex items-center justify-center min-h-[60vh]">
@@ -507,14 +496,16 @@ function App({ user, isShared = false }) {
           <div ref={messagesEndRef} />
         </div>
       </div>
-      <div className={`p-2 sm:p-3 w-full mx-auto transition-all duration-300 ${thinkingPanel !== null ? 'max-w-[700px]' : 'max-w-[800px]'} pb-safe`}>
-        <PromptInputBox 
-          onSend={handleSendMessage} 
-          isLoading={isLoading} 
-          defaultModel={selectedModel}
-          selectedModel={selectedModel}
-          onStop={handleStop}
-        />
+      <div className={`fixed bottom-0 left-0 right-0 p-2 sm:p-3 bg-gradient-to-t from-black via-black/95 to-transparent backdrop-blur-sm ${sidebarOpen ? 'lg:left-64' : 'left-0'} ${thinkingPanel !== null ? 'lg:right-[300px]' : 'right-0'} z-10 pb-safe`}>
+        <div className={`w-full mx-auto ${thinkingPanel !== null ? 'max-w-[700px]' : 'max-w-[800px]'}`}>
+          <PromptInputBox 
+            onSend={handleSendMessage} 
+            isLoading={isLoading} 
+            defaultModel={selectedModel}
+            selectedModel={selectedModel}
+            onStop={handleStop}
+          />
+        </div>
       </div>
       </div>
       {thinkingPanel !== null && messages[thinkingPanel]?.thinking && (

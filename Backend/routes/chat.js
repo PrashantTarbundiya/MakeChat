@@ -34,6 +34,10 @@ router.post('/save', authenticate, async (req, res) => {
     const { chatId, messages, title, uploadedFile } = req.body;
     
     if (chatId) {
+      const existingChat = await Chat.findOne({ _id: chatId, userId: req.userId });
+      if (!existingChat) {
+        return res.status(404).json({ error: 'Chat not found' });
+      }
       const updateData = { messages, title, updatedAt: Date.now() };
       if (uploadedFile) {
         updateData.$push = { uploadedFiles: uploadedFile };
