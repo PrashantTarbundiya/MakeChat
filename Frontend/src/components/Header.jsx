@@ -11,7 +11,7 @@ export const Header = ({ sidebarOpen, setSidebarOpen }) => {
           </svg>
         </button>
         <img src="https://res.cloudinary.com/durcxd0dn/image/upload/v1764748775/cropped_circle_image_no7c6p.png" alt="MakeChat" className="w-6 h-6 rounded-full" />
-        <span className="text-white font-semibold">MakeChat</span>
+        <span className="text-white font-semibold text-sm sm:text-base">MakeChat</span>
       </div>
       <button className="p-1 hover:bg-white/10 rounded transition-colors text-white">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

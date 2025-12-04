@@ -58,7 +58,7 @@ export const MessageBubble = ({ content, role }) => {
   const hasMediaHTML = content.includes('<video') || content.includes('<audio') || content.includes('media-container') || content.includes('loader-box') || content.includes('file-download');
 
   return (
-    <div className={`rounded-2xl w-full ${
+    <div className={`rounded-2xl w-full overflow-x-auto ${
       role === 'user' ? 'bg-[#1F2023] text-white px-3 py-1' : 'text-white px-2 py-1'
     }`}>
       {hasMediaHTML ? (
@@ -120,13 +120,13 @@ export const MessageBubble = ({ content, role }) => {
             return <ol className="list-decimal list-inside mb-3 space-y-1">{children}</ol>;
           },
           h1({ children }) {
-            return <h1 className="text-2xl font-bold mb-3 mt-4">{children}</h1>;
+            return <h1 className="text-xl sm:text-2xl font-bold mb-3 mt-4">{children}</h1>;
           },
           h2({ children }) {
-            return <h2 className="text-xl font-bold mb-2 mt-3">{children}</h2>;
+            return <h2 className="text-lg sm:text-xl font-bold mb-2 mt-3">{children}</h2>;
           },
           h3({ children }) {
-            return <h3 className="text-lg font-bold mb-2 mt-2">{children}</h3>;
+            return <h3 className="text-base sm:text-lg font-bold mb-2 mt-2">{children}</h3>;
           },
           table({ children }) {
             return (
@@ -148,13 +148,13 @@ export const MessageBubble = ({ content, role }) => {
           },
           th({ children }) {
             return (
-              <th className="border-r border-gray-600 px-4 py-3 text-left font-semibold text-white text-sm">
+              <th className="border-r border-gray-600 px-2 sm:px-4 py-2 sm:py-3 text-left font-semibold text-white text-xs sm:text-sm">
                 {children}
               </th>
             );
           },
           td({ children }) {
-            return <td className="border-r border-gray-600 px-4 py-3 text-gray-300 text-sm">{children}</td>;
+            return <td className="border-r border-gray-600 px-2 sm:px-4 py-2 sm:py-3 text-gray-300 text-xs sm:text-sm">{children}</td>;
           },
           blockquote({ children }) {
             return (
@@ -169,8 +169,8 @@ export const MessageBubble = ({ content, role }) => {
               <img 
                 src={src} 
                 alt={alt || 'Uploaded image'} 
-                className="rounded-lg my-2 block" 
-                style={{width: '150px', height: '100px', objectFit: 'cover'}} 
+                className="rounded-lg my-2 block max-w-full" 
+                style={{maxWidth: '150px', height: 'auto', objectFit: 'cover'}} 
                 loading="lazy"
               />
             );

@@ -292,7 +292,7 @@ const PromptInputTextarea = ({ className, onKeyDown, disableAutosize = false, pl
   }, [value, maxHeight, disableAutosize]);
 
   const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey && window.innerWidth > 768) {
       e.preventDefault();
       onSubmit?.();
     }
@@ -603,7 +603,7 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
         <PromptInputActions className="flex items-center justify-between gap-2 p-0 pt-2">
           <div
             className={cn(
-              "flex items-center gap-1 transition-opacity duration-300",
+              "flex items-center gap-1 transition-opacity duration-300 flex-wrap",
               isRecording ? "opacity-0 invisible h-0" : "opacity-100 visible"
             )}
           >
@@ -613,10 +613,11 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
                   e.stopPropagation();
                   setShowModelDropdown(!showModelDropdown);
                 }}
-                className="flex h-8 px-3 text-[#9CA3AF] cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-gray-600/30 hover:text-[#D1D5DB] text-xs font-medium gap-1"
+                className="flex h-8 px-2 sm:px-3 text-[#9CA3AF] cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-gray-600/30 hover:text-[#D1D5DB] text-[10px] sm:text-xs font-medium gap-1"
                 disabled={isRecording}
               >
-                {models.find(m => m.id === selectedModel)?.name}
+                <span className="hidden sm:inline">{models.find(m => m.id === selectedModel)?.name}</span>
+                <span className="sm:hidden">{models.find(m => m.id === selectedModel)?.name.split(' ')[0]}</span>
                 <span className="text-[10px]">▼</span>
               </button>
               {showModelDropdown && (
@@ -668,12 +669,12 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
 
             <CustomDivider />
 
-            <div className="flex items-center">
+            <div className="flex items-center flex-wrap gap-0">
               <button
                 type="button"
                 onClick={() => handleToggleChange("search")}
                 className={cn(
-                  "rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
+                  "rounded-full transition-all flex items-center gap-1 px-1.5 sm:px-2 py-1 border h-8",
                   showSearch
                     ? "bg-[#1EAEDB]/15 border-[#1EAEDB] text-[#1EAEDB]"
                     : "bg-transparent border-transparent text-[#9CA3AF] hover:text-[#D1D5DB]"
@@ -695,7 +696,7 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
                       animate={{ width: "auto", opacity: 1 }}
                       exit={{ width: 0, opacity: 0 }}
                       transition={{ duration: 0.2 }}
-                      className="text-xs overflow-hidden whitespace-nowrap text-[#1EAEDB] flex-shrink-0"
+                      className="text-[10px] sm:text-xs overflow-hidden whitespace-nowrap text-[#1EAEDB] flex-shrink-0 hidden sm:inline"
                     >
                       Search
                     </motion.span>
@@ -709,7 +710,7 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
                 type="button"
                 onClick={() => handleToggleChange("think")}
                 className={cn(
-                  "rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
+                  "rounded-full transition-all flex items-center gap-1 px-1.5 sm:px-2 py-1 border h-8",
                   showThink
                     ? "bg-[#8B5CF6]/15 border-[#8B5CF6] text-[#8B5CF6]"
                     : "bg-transparent border-transparent text-[#9CA3AF] hover:text-[#D1D5DB]"
@@ -731,7 +732,7 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
                       animate={{ width: "auto", opacity: 1 }}
                       exit={{ width: 0, opacity: 0 }}
                       transition={{ duration: 0.2 }}
-                      className="text-xs overflow-hidden whitespace-nowrap text-[#8B5CF6] flex-shrink-0"
+                      className="text-[10px] sm:text-xs overflow-hidden whitespace-nowrap text-[#8B5CF6] flex-shrink-0 hidden sm:inline"
                     >
                       Think
                     </motion.span>
@@ -745,7 +746,7 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
                 type="button"
                 onClick={handleCanvasToggle}
                 className={cn(
-                  "rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
+                  "rounded-full transition-all flex items-center gap-1 px-1.5 sm:px-2 py-1 border h-8",
                   showCanvas
                     ? "bg-[#F97316]/15 border-[#F97316] text-[#F97316]"
                     : "bg-transparent border-transparent text-[#9CA3AF] hover:text-[#D1D5DB]"
@@ -767,7 +768,7 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
                       animate={{ width: "auto", opacity: 1 }}
                       exit={{ width: 0, opacity: 0 }}
                       transition={{ duration: 0.2 }}
-                      className="text-xs overflow-hidden whitespace-nowrap text-[#F97316] flex-shrink-0"
+                      className="text-[10px] sm:text-xs overflow-hidden whitespace-nowrap text-[#F97316] flex-shrink-0 hidden sm:inline"
                     >
                       Canvas
                     </motion.span>

@@ -14,7 +14,7 @@ export const Settings = ({ user, isOpen, setIsOpen, onLogout }) => {
   const fetchSettings = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/memory', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/memory`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -30,7 +30,7 @@ export const Settings = ({ user, isOpen, setIsOpen, onLogout }) => {
     if (!newMemory.trim()) return;
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/memory/add', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/memory/add`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -50,7 +50,7 @@ export const Settings = ({ user, isOpen, setIsOpen, onLogout }) => {
   const deleteMemory = async (index) => {
     try {
       const token = localStorage.getItem('token');
-      await fetch(`http://localhost:8000/api/memory/${index}`, {
+      await fetch(`${import.meta.env.VITE_API_URL}/api/memory/${index}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -64,7 +64,7 @@ export const Settings = ({ user, isOpen, setIsOpen, onLogout }) => {
     if (!confirm('Delete all personalized memories?')) return;
     try {
       const token = localStorage.getItem('token');
-      await fetch('http://localhost:8000/api/memory/clear', {
+      await fetch(`${import.meta.env.VITE_API_URL}/api/memory/clear`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });

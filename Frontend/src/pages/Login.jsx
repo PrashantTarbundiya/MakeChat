@@ -37,8 +37,8 @@ export const Login = ({ onLogin }) => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-black">
-      <div className="bg-[#1F2023] p-8 rounded-2xl shadow-2xl w-full max-w-md border border-gray-700">
+    <div className="flex items-center justify-center min-h-screen bg-black px-4">
+      <div className="bg-[#1F2023] p-4 sm:p-8 rounded-2xl shadow-2xl w-full max-w-md border border-gray-700">
         <div className="flex items-center justify-center gap-3 mb-6">
           <img src="https://res.cloudinary.com/durcxd0dn/image/upload/v1736683562/cropped_circle_image_no7c6p.png" alt="MakeChat" className="w-10 h-10" />
           <span className="text-2xl font-bold text-white">MakeChat</span>
@@ -76,9 +76,10 @@ export const Login = ({ onLogin }) => {
             </div>
           </div>
           <div className="mt-4">
-            <div className="w-full flex justify-center">
+            <div className="w-full flex justify-center overflow-hidden">
             <GoogleLogin
-              width="384"
+              width="100%"
+              size="large"
               onSuccess={async (credentialResponse) => {
                 try {
                   const decoded = jwtDecode(credentialResponse.credential);

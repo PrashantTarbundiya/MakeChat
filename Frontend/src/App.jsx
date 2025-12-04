@@ -396,13 +396,13 @@ function App({ user, isShared = false }) {
         setIsOpen={setSidebarOpen}
         onOpenSettings={() => setSettingsOpen(true)}
       />
-      <div className={`flex flex-col flex-1 transition-all duration-300 ${sidebarOpen ? 'lg:ml-64' : 'ml-0'} ${thinkingPanel !== null ? 'mr-[300px]' : ''}`}>
-      <div className="flex-1 overflow-y-auto p-4 pt-[66px] scrollbar-thin scrollbar-thumb-black scrollbar-track-black">
+      <div className={`flex flex-col flex-1 transition-all duration-300 ${sidebarOpen ? 'lg:ml-64' : 'ml-0'} ${thinkingPanel !== null ? 'lg:mr-[300px]' : ''}`}>
+      <div className="flex-1 overflow-y-auto p-2 sm:p-4 pt-[66px] scrollbar-thin scrollbar-thumb-black scrollbar-track-black">
         <div className="max-w-[900px] mx-auto space-y-4">
           {messages.length === 0 && !isLoading && (
             <div className="flex items-center justify-center h-[calc(100vh-200px)]">
-              <div className="text-center">
-                <h1 className="text-4xl font-bold text-white mb-4">
+              <div className="text-center px-4">
+                <h1 className="text-2xl sm:text-4xl font-bold text-white mb-4">
                   {[
                     `Hello, ${user.name}! 👋`,
                     `Welcome back, ${user.name}! ✨`,
@@ -416,7 +416,7 @@ function App({ user, isShared = false }) {
                     `Hello! I'm here to help! 💡`
                   ][Math.floor(Math.random() * 10)]}
                 </h1>
-                <p className="text-gray-400 text-lg">Start a conversation or ask me anything</p>
+                <p className="text-gray-400 text-sm sm:text-lg">Start a conversation or ask me anything</p>
               </div>
             </div>
           )}
@@ -507,7 +507,7 @@ function App({ user, isShared = false }) {
           <div ref={messagesEndRef} />
         </div>
       </div>
-      <div className={`p-4 w-full mx-auto transition-all duration-300 ${thinkingPanel !== null ? 'max-w-[700px]' : 'max-w-[800px]'}`}>
+      <div className={`p-2 sm:p-4 w-full mx-auto transition-all duration-300 ${thinkingPanel !== null ? 'max-w-[700px]' : 'max-w-[800px]'}`}>
         <PromptInputBox 
           onSend={handleSendMessage} 
           isLoading={isLoading} 
@@ -518,7 +518,7 @@ function App({ user, isShared = false }) {
       </div>
       </div>
       {thinkingPanel !== null && messages[thinkingPanel]?.thinking && (
-        <div className="fixed right-0 top-0 h-full w-[300px] bg-[#1F2023] border-l border-gray-700 shadow-2xl z-50 flex flex-col">
+        <div className="fixed right-0 top-0 h-full w-full sm:w-[300px] bg-[#1F2023] border-l border-gray-700 shadow-2xl z-50 flex flex-col">
           <div className="flex items-center justify-between p-4 border-b border-gray-700">
             <h3 className="text-white font-semibold flex items-center gap-2">
               <span>💭</span> Thinking Process

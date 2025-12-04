@@ -27,7 +27,7 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
   const fetchChats = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/chat/history', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/chat/history`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -42,7 +42,7 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
   const deleteChat = async (chatId) => {
     try {
       const token = localStorage.getItem('token');
-      await fetch(`http://localhost:8000/api/chat/${chatId}`, {
+      await fetch(`${import.meta.env.VITE_API_URL}/api/chat/${chatId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -64,7 +64,7 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
     if (!editTitle.trim()) return;
     try {
       const token = localStorage.getItem('token');
-      await fetch(`http://localhost:8000/api/chat/${chatId}/rename`, {
+      await fetch(`${import.meta.env.VITE_API_URL}/api/chat/${chatId}/rename`, {
         method: 'PUT',
         headers: { 
           'Authorization': `Bearer ${token}`,
