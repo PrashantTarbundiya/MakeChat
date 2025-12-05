@@ -133,23 +133,68 @@ Button.displayName = "Button";
 const VoiceRecorder = ({ isRecording, onStartRecording, onStopRecording, visualizerBars = 32 }) => {
   const [time, setTime] = React.useState(0);
   const timerRef = React.useRef(null);
+  const mediaRecorderRef = React.useRef(null);
+  const chunksRef = React.useRef([]);
 
   React.useEffect(() => {
     if (isRecording) {
-      onStartRecording();
+      startRecording();
       timerRef.current = setInterval(() => setTime((t) => t + 1), 1000);
     } else {
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
-      onStopRecording(time);
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
       setTime(0);
     }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [isRecording, time, onStartRecording, onStopRecording]);
+  }, [isRecording]);
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      chunksRef.current = [];
+
+      mediaRecorderRef.current.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      mediaRecorderRef.current.onstop = async () => {
+        const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        const text = await transcribeAudio(audioBlob);
+        onStopRecording(text);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorderRef.current.start();
+      onStartRecording();
+    } catch (error) {
+      console.error('Microphone access denied:', error);
+      onStopRecording('');
+    }
+  };
+
+  const transcribeAudio = async (audioBlob) => {
+    try {
+      const formData = new FormData();
+      formData.append('audio', audioBlob);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/ai/transcribe`, {
+        method: 'POST',
+        body: formData
+      });
+      const data = await response.json();
+      return data.text || '';
+    } catch (error) {
+      console.error('Transcription failed:', error);
+      return '';
+    }
+  };
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -495,12 +540,13 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
     }
   };
 
-  const handleStartRecording = () => console.log("Started recording");
+  const handleStartRecording = () => {};
 
-  const handleStopRecording = (duration) => {
-    console.log(`Stopped recording after ${duration} seconds`);
+  const handleStopRecording = (transcribedText) => {
     setIsRecording(false);
-    onSend(`[Voice message - ${duration} seconds]`, []);
+    if (transcribedText && transcribedText.trim()) {
+      setInput(transcribedText);
+    }
   };
 
   const hasContent = input.trim() !== "" || files.length > 0;

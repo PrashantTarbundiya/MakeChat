@@ -7,7 +7,7 @@ export const MessageActions = ({
   onRegenerate, 
   onEdit, 
   onCopy, 
-  isCopied 
+  isCopied
 }) => {
   if (role === 'user') {
     return (

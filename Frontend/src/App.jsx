@@ -26,6 +26,7 @@ function App({ user, isShared = false }) {
   const [loadingState, setLoadingState] = useState('');
   const [shareToken, setShareToken] = useState(null);
   const [isForked, setIsForked] = useState(false);
+
   const messagesEndRef = useRef(null);
   const abortControllerRef = useRef(null);
 
@@ -317,6 +318,11 @@ function App({ user, isShared = false }) {
       if (response.ok) {
         const chat = await response.json();
         if (!currentChatId) setCurrentChatId(chat._id);
+        // Update cache - move edited chat to top
+        const cachedChats = JSON.parse(localStorage.getItem('cachedChats') || '[]');
+        const filteredChats = cachedChats.filter(c => c._id !== chat._id);
+        const updatedCache = [{ ...chat, updatedAt: new Date().toISOString() }, ...filteredChats].slice(0, 4);
+        localStorage.setItem('cachedChats', JSON.stringify(updatedCache));
       }
     } catch (error) {
       console.error('Failed to save chat:', error);
@@ -539,6 +545,8 @@ function App({ user, isShared = false }) {
         </>
       )}
       <Settings user={user} isOpen={settingsOpen} setIsOpen={setSettingsOpen} onLogout={handleLogout} />
+      
+
     </div>
   );
 }

@@ -26,13 +26,22 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
 
   const fetchChats = async () => {
     try {
+      // Load from cache first
+      const cachedChats = localStorage.getItem('cachedChats');
+      if (cachedChats) {
+        setChats(JSON.parse(cachedChats));
+      }
+
+      // Then fetch fresh data
       const token = localStorage.getItem('token');
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/chat/history`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
         const data = await response.json();
+        const recentChats = data.slice(0, 4); // Keep only last 4
         setChats(data);
+        localStorage.setItem('cachedChats', JSON.stringify(recentChats));
       }
     } catch (error) {
       console.error('Failed to fetch chats:', error);
@@ -49,6 +58,9 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
       fetchChats();
       if (currentChatId === chatId) onNewChat();
       setDeleteConfirm(null);
+      // Update cache
+      const updatedChats = chats.filter(c => c._id !== chatId).slice(0, 4);
+      localStorage.setItem('cachedChats', JSON.stringify(updatedChats));
     } catch (error) {
       console.error('Failed to delete chat:', error);
     }
@@ -74,6 +86,13 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
       });
       fetchChats();
       setEditingId(null);
+      // Update cache - move renamed chat to top
+      const renamedChat = chats.find(c => c._id === chatId);
+      if (renamedChat) {
+        const filteredChats = chats.filter(c => c._id !== chatId);
+        const updatedChats = [{ ...renamedChat, title: editTitle, updatedAt: new Date().toISOString() }, ...filteredChats].slice(0, 4);
+        localStorage.setItem('cachedChats', JSON.stringify(updatedChats));
+      }
     } catch (error) {
       console.error('Failed to rename chat:', error);
     }

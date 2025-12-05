@@ -69,9 +69,14 @@ router.post('/chat', upload.array('files'), async (req, res) => {
       } else if (file.mimetype === 'application/pdf') {
         try {
           const pdfData = await pdfParse(file.buffer);
-          documentText = `\n\n[PDF Document Content]:\n${pdfData.text}`;
+          if (pdfData && pdfData.text && pdfData.text.trim()) {
+            documentText = `\n\n[PDF Document Content]:\n${pdfData.text}`;
+          } else {
+            documentText = '\n\n[PDF appears to be empty or contains only images. Please describe what you need help with regarding this PDF.]';
+          }
         } catch (e) {
-          documentText = '\n\n[PDF parsing failed]';
+          console.error('PDF parsing error:', e);
+          documentText = '\n\n[Unable to extract text from PDF. The file may be image-based or protected. Please describe what you need help with.]';
         }
       } else if (file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
         const result = await mammoth.extractRawText({ buffer: file.buffer });
@@ -497,6 +502,35 @@ router.post('/chat', upload.array('files'), async (req, res) => {
         res.status(500).json({ error: error.message });
       }
     }
+  }
+});
+
+router.post('/transcribe', upload.single('audio'), async (req, res) => {
+  try {
+    const audioFile = req.file;
+    if (!audioFile) {
+      return res.status(400).json({ error: 'No audio file provided' });
+    }
+
+    // Use Groq Whisper for transcription
+    const formData = new FormData();
+    const audioBlob = new Blob([audioFile.buffer], { type: 'audio/webm' });
+    formData.append('file', audioBlob, 'audio.webm');
+    formData.append('model', 'whisper-large-v3');
+
+    const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
+      },
+      body: formData
+    });
+
+    const data = await response.json();
+    res.json({ text: data.text || '' });
+  } catch (error) {
+    console.error('Transcription error:', error);
+    res.status(500).json({ error: 'Transcription failed', text: '' });
   }
 });
 

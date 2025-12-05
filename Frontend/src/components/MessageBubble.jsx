@@ -74,35 +74,38 @@ export const MessageBubble = ({ content, role }) => {
 
             return !inline && match ? (
               <div className="relative group my-4">
-                <div className="flex items-center justify-between bg-[#1e1e1e] px-4 py-2 rounded-t-lg">
-                  <span className="text-xs text-gray-400">{match[1]}</span>
+                <div className="flex items-center justify-between bg-[#1e1e1e] px-2 sm:px-4 py-2 rounded-t-lg">
+                  <span className="text-[10px] sm:text-xs text-gray-400">{match[1]}</span>
                   <button
                     onClick={() => handleCopyCode(codeString, codeIndex)}
-                    className="flex items-center gap-1 px-2 py-1 text-xs bg-white/10 hover:bg-white/20 rounded transition-colors"
+                    className="flex items-center gap-1 px-1.5 sm:px-2 py-1 text-[10px] sm:text-xs bg-white/10 hover:bg-white/20 rounded transition-colors"
                   >
                     {copiedCode === codeIndex ? (
                       <>
                         <Check className="w-3 h-3" />
-                        Copied
+                        <span className="hidden sm:inline">Copied</span>
                       </>
                     ) : (
                       <>
                         <Copy className="w-3 h-3" />
-                        Copy
+                        <span className="hidden sm:inline">Copy</span>
                       </>
                     )}
                   </button>
                 </div>
+                <div className="overflow-x-auto">
                 <SyntaxHighlighter
                   style={vscDarkPlus}
                   language={match[1]}
                   PreTag="div"
-                  className="!mt-0 !rounded-t-none"
+                  className="!mt-0 !rounded-t-none !text-xs sm:!text-sm"
                   wrapLongLines={true}
+                  customStyle={{ margin: 0, fontSize: 'inherit' }}
                   {...props}
                 >
                   {codeString}
                 </SyntaxHighlighter>
+                </div>
               </div>
             ) : (
               <code className="bg-gray-700 px-1.5 py-0.5 rounded text-sm break-all" {...props}>
