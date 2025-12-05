@@ -31,11 +31,15 @@ const MODELS = {
   'deepseek': 'deepseek/deepseek-v3.2',
   'qwen-32b': 'qwen/qwen3-32b',
   'claude-opus': 'anthropic/claude-opus-4-5',
+  'llm-council': 'council',
   'bytez-image': 'google/imagen-4.0-ultra-generate-001',
   'bytez-video': 'ali-vilab/text-to-video-ms-1.7b',
   'bytez-audio': 'suno/bark-small',
   'bytez-music': 'facebook/musicgen-stereo-small'
 };
+
+const COUNCIL_MODELS = ['grok-fast', 'gemini-pro','gpt-oss','kimi'];
+const CHAIRMAN_MODEL = 'deepseek/deepseek-v3.2';
 
 router.post('/chat', upload.array('files'), async (req, res) => {
   try {
@@ -180,6 +184,138 @@ router.post('/chat', upload.array('files'), async (req, res) => {
     }
 
     let fullResponse = '';
+
+    // Handle LLM Council mode
+    if (model === 'llm-council') {
+      res.write(`data: ${JSON.stringify({ content: '### 🏛️ LLM Council - Stage 1: Gathering Opinions\n\n' })}
+
+`);
+      
+      const councilResponses = [];
+      
+      // Stage 1: Get responses from all council members
+      for (const councilModel of COUNCIL_MODELS) {
+        res.write(`data: ${JSON.stringify({ content: `**${councilModel.toUpperCase()}** is thinking...\n` })}
+
+`);
+        
+        let response = '';
+        if (councilModel === 'gemini-pro') {
+          const result = await genAI.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+            systemInstruction: systemPrompt
+          });
+          response = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        } else if (councilModel === 'grok-fast') {
+          const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: MODELS[councilModel], messages: [{ role: 'user', content: userMessage }] })
+          });
+          const data = await resp.json();
+          response = data.choices?.[0]?.message?.content || '';
+        } else {
+          const completion = await groq.chat.completions.create({
+            messages: [{ role: 'user', content: userMessage }],
+            model: MODELS[councilModel],
+            temperature: 1,
+            max_completion_tokens: 2048
+          });
+          response = completion.choices[0]?.message?.content || '';
+        }
+        
+        councilResponses.push({ model: councilModel, response });
+        res.write(`data: ${JSON.stringify({ content: `✓ ${councilModel.toUpperCase()} responded\n` })}
+
+`);
+      }
+      
+      // Stage 2: Review and rank
+      res.write(`data: ${JSON.stringify({ content: '\n### 🔍 Stage 2: Peer Review\n\n' })}
+
+`);
+      
+      const rankings = [];
+      for (let i = 0; i < councilResponses.length; i++) {
+        const reviewer = councilResponses[i];
+        const othersAnonymized = councilResponses
+          .filter((_, idx) => idx !== i)
+          .map((r, idx) => `Response ${idx + 1}: ${r.response}`)
+          .join('\n\n');
+        
+        const reviewPrompt = `You are reviewing responses to: "${userMessage}"\n\nHere are the responses:\n${othersAnonymized}\n\nRank these responses from best to worst (1 being best) based on accuracy and insight. Respond with just the rankings like: 1,2,3`;
+        
+        let ranking = '';
+        if (reviewer.model === 'gemini-pro') {
+          const result = await genAI.models.generateContent({ model: 'gemini-2.5-flash', contents: [{ role: 'user', parts: [{ text: reviewPrompt }] }] });
+          ranking = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        } else if (reviewer.model === 'grok-fast') {
+          const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: MODELS[reviewer.model], messages: [{ role: 'user', content: reviewPrompt }] })
+          });
+          const data = await resp.json();
+          ranking = data.choices?.[0]?.message?.content || '';
+        } else {
+          const completion = await groq.chat.completions.create({
+            messages: [{ role: 'user', content: reviewPrompt }],
+            model: MODELS[reviewer.model],
+            temperature: 0.5,
+            max_completion_tokens: 100
+          });
+          ranking = completion.choices[0]?.message?.content || '';
+        }
+        rankings.push(ranking);
+      }
+      
+      res.write(`data: ${JSON.stringify({ content: 'Reviews collected\n' })}
+
+`);
+      
+      // Stage 3: Chairman produces final response
+      res.write(`data: ${JSON.stringify({ content: '\n### 👔 Stage 3: Chairman\'s Final Response\n\n' })}
+
+`);
+      
+      const allResponses = councilResponses.map((r, i) => `**${r.model.toUpperCase()}:**\n${r.response}`).join('\n\n---\n\n');
+      const chairmanPrompt = `You are the Chairman of an LLM Council. The user asked: "${userMessage}"\n\nHere are the responses from council members:\n\n${allResponses}\n\nBased on these responses and peer reviews, provide a comprehensive final answer that synthesizes the best insights.`;
+      
+      const chairmanResp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: CHAIRMAN_MODEL, messages: [{ role: 'user', content: chairmanPrompt }], stream: true })
+      });
+      
+      const reader = chairmanResp.body.getReader();
+      const decoder = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n').filter(line => line.trim().startsWith('data:'));
+        for (const line of lines) {
+          const data = line.replace('data: ', '').trim();
+          if (data === '[DONE]') break;
+          if (!data) continue;
+          try {
+            const parsed = JSON.parse(data);
+            const content = parsed.choices[0]?.delta?.content;
+            if (content) {
+              fullResponse += content;
+              res.write(`data: ${JSON.stringify({ content })}
+
+`);
+            }
+          } catch (e) {}
+        }
+      }
+      
+      res.write('data: [DONE]\n\n');
+      res.end();
+      return;
+    }
     
     // Detect file generation request
     const fileGenMatch = message.match(/(?:provide|give|create|generate|make).*?(?:in|as|to)\s+(pdf|docx|txt|csv|json|xml|html|md)/i);

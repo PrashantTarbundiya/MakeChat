@@ -7,7 +7,41 @@ import { useState, useEffect, useRef } from 'react';
 
 export const MessageBubble = ({ content, role }) => {
   const [copiedCode, setCopiedCode] = useState(null);
+  const [showThinking, setShowThinking] = useState(false);
   const mediaRef = useRef(null);
+
+  // Parse reasoning model response (thinking + answer + web search + canvas)
+  const parseReasoningResponse = (text) => {
+    let thinking = null;
+    let webSearch = null;
+    let canvas = null;
+    let answer = text;
+
+    // Extract thinking
+    const thinkMatch = text.match(/<think>([\s\S]*?)<\/think>/i);
+    if (thinkMatch) {
+      thinking = thinkMatch[1].trim();
+      answer = answer.replace(/<think>[\s\S]*?<\/think>/i, '');
+    }
+
+    // Extract web search
+    const searchMatch = answer.match(/\[WEB SEARCH RESULTS\]([\s\S]*?)\[\/WEB SEARCH RESULTS\]/i);
+    if (searchMatch) {
+      webSearch = searchMatch[1].trim();
+      answer = answer.replace(/\[WEB SEARCH RESULTS\][\s\S]*?\[\/WEB SEARCH RESULTS\]/i, '');
+    }
+
+    // Extract canvas
+    const canvasMatch = answer.match(/\[CANVAS\]([\s\S]*?)\[\/CANVAS\]/i);
+    if (canvasMatch) {
+      canvas = canvasMatch[1].trim();
+      answer = answer.replace(/\[CANVAS\][\s\S]*?\[\/CANVAS\]/i, '');
+    }
+
+    return { thinking, webSearch, canvas, answer: answer.trim() };
+  };
+
+  const { thinking, webSearch, canvas, answer } = parseReasoningResponse(content);
 
   const handleCopyCode = (code, index) => {
     navigator.clipboard.writeText(code);
@@ -55,14 +89,42 @@ export const MessageBubble = ({ content, role }) => {
   }, [content]);
 
   // Check if content contains HTML media elements, loader, or file download
-  const hasMediaHTML = content.includes('<video') || content.includes('<audio') || content.includes('media-container') || content.includes('loader-box') || content.includes('file-download');
+  const hasMediaHTML = answer.includes('<video') || answer.includes('<audio') || answer.includes('media-container') || answer.includes('loader-box') || answer.includes('file-download');
 
   return (
     <div className={`rounded-2xl w-full overflow-x-auto ${
       role === 'user' ? 'bg-[#1F2023] text-white px-3 py-1' : 'text-white px-2 py-1'
     }`}>
+      {thinking && (
+        <div className="mb-4 border-l-4 border-orange-500 bg-orange-500/10 rounded-r-lg">
+          <button
+            onClick={() => setShowThinking(!showThinking)}
+            className="w-full px-4 py-2 text-left text-sm font-semibold text-orange-400 hover:text-orange-300 transition flex items-center justify-between"
+          >
+            <span>🧠 Thinking Process</span>
+            <span className="text-xs">{showThinking ? '▼' : '▶'}</span>
+          </button>
+          {showThinking && (
+            <div className="px-4 pb-3 text-sm text-gray-300 whitespace-pre-wrap">
+              {thinking}
+            </div>
+          )}
+        </div>
+      )}
+      {webSearch && (
+        <div className="mb-4 border-l-4 border-teal-500 bg-teal-500/10 rounded-r-lg p-4">
+          <div className="text-sm font-semibold text-teal-400 mb-2">🔍 Web Search Results</div>
+          <div className="text-xs text-gray-400 whitespace-pre-wrap">{webSearch}</div>
+        </div>
+      )}
+      {canvas && (
+        <div className="mb-4 border-l-4 border-pink-500 bg-pink-500/10 rounded-r-lg p-4">
+          <div className="text-sm font-semibold text-pink-400 mb-2">🎨 Canvas Content</div>
+          <div className="text-xs text-gray-300 whitespace-pre-wrap font-mono">{canvas}</div>
+        </div>
+      )}
       {hasMediaHTML ? (
-        <div ref={mediaRef} dangerouslySetInnerHTML={{ __html: content }} />
+        <div ref={mediaRef} dangerouslySetInnerHTML={{ __html: answer }} />
       ) : (
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
@@ -186,7 +248,7 @@ export const MessageBubble = ({ content, role }) => {
           },
         }}
       >
-        {content}
+        {answer}
       </ReactMarkdown>
       )}
     </div>
