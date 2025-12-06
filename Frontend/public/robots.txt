@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /chat
+Disallow: /login
+Disallow: /signup
+
+Sitemap: https://make-chat.vercel.app/sitemap.xml

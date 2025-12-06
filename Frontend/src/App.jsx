@@ -201,7 +201,10 @@ function App({ user, isShared = false }) {
         cleanResponse = cleanResponse.replace(/<think>[\s\S]*?<\/think>/, '').trim();
       }
       
-      setMessages(prev => [...prev, { role: 'assistant', content: cleanResponse, model, mode: isSearch ? 'search' : isThink ? 'think' : isCanvas ? 'canvas' : 'normal', thinking: extractedThinking || undefined }]);
+      // Store thinking if present
+      const hasThinking = extractedThinking && extractedThinking.trim().length > 0;
+      
+      setMessages(prev => [...prev, { role: 'assistant', content: cleanResponse, model, mode: isSearch ? 'search' : isThink ? 'think' : isCanvas ? 'canvas' : 'normal', thinking: hasThinking ? extractedThinking : undefined }]);
       setCurrentResponse('');
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     } catch (error) {
@@ -270,8 +273,8 @@ function App({ user, isShared = false }) {
   };
 
   const handleSelectChat = async (chatId) => {
-    const mediaModels = ['bytez-image', 'bytez-video', 'bytez-audio', 'bytez-music'];
-    if (mediaModels.includes(chatId)) {
+    const specialModels = ['bytez-image', 'bytez-video', 'bytez-audio', 'bytez-music', 'llm-council'];
+    if (specialModels.includes(chatId)) {
       handleNewChat();
       setSelectedModel(chatId);
       return;
