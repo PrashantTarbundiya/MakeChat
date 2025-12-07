@@ -395,7 +395,7 @@ function App({ user, isShared = false }) {
         onOpenSettings={() => setSettingsOpen(true)}
       />
       <div className={`flex flex-col flex-1 transition-all duration-300 ${sidebarOpen ? 'lg:ml-64' : 'ml-0'} ${thinkingPanel !== null ? 'lg:mr-[300px]' : ''} h-screen`}>
-      <div className="flex-1 overflow-y-auto p-2 sm:p-4 pt-[58px] pb-[90px] scrollbar-thin scrollbar-thumb-black scrollbar-track-black">
+      <div className="flex-1 overflow-y-auto p-2 sm:p-4 pt-[70px] md:pt-[80px] pb-[120px] md:pb-[140px] scrollbar-thin scrollbar-thumb-black scrollbar-track-black">
         <div className="max-w-[900px] mx-auto space-y-4">
           {messages.length === 0 && !isLoading && (
             <div className="flex items-center justify-center min-h-[60vh]">
@@ -487,7 +487,7 @@ function App({ user, isShared = false }) {
               </div>
             </div>
           )}
-          {currentResponse && (
+          {currentResponse && !currentResponse.includes('media-container') && (
             <div className="flex justify-start">
               <div className="max-w-[95%]">
                 {messages[messages.length - 1]?.mode === 'canvas' ? (
