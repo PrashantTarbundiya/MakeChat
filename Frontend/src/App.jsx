@@ -29,11 +29,8 @@ function App({ user, isShared = false }) {
 
   const messagesEndRef = useRef(null);
   const abortControllerRef = useRef(null);
-  const scrollContainerRef = useRef(null);
-  const [userScrolled, setUserScrolled] = useState(false);
 
   const handleSendMessage = async (message, files, model) => {
-    setUserScrolled(false);
     // Fork shared chat on first message
     if (isShared && !isForked && user) {
       try {
@@ -209,7 +206,6 @@ function App({ user, isShared = false }) {
       
       setMessages(prev => [...prev, { role: 'assistant', content: cleanResponse, model, mode: isSearch ? 'search' : isThink ? 'think' : isCanvas ? 'canvas' : 'normal', thinking: hasThinking ? extractedThinking : undefined }]);
       setCurrentResponse('');
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     } catch (error) {
       if (error.name === 'AbortError') {
         if (currentResponse) {
@@ -361,29 +357,7 @@ function App({ user, isShared = false }) {
     }
   }, [messages, isShared]);
 
-  useEffect(() => {
-    if (!userScrolled && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'auto', block: 'end' });
-    }
-  }, [messages, currentResponse, userScrolled]);
 
-  useEffect(() => {
-    const handleScroll = (e) => {
-      const container = e.target;
-      const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50;
-      if (!isAtBottom && isLoading) {
-        setUserScrolled(true);
-      } else if (isAtBottom) {
-        setUserScrolled(false);
-      }
-    };
-
-    const container = scrollContainerRef.current;
-    if (container) {
-      container.addEventListener('scroll', handleScroll, { passive: true });
-      return () => container.removeEventListener('scroll', handleScroll);
-    }
-  }, [isLoading]);
 
   useEffect(() => {
     const handleBeforeUnload = () => {
@@ -411,7 +385,7 @@ function App({ user, isShared = false }) {
         onOpenSettings={() => setSettingsOpen(true)}
       />
       <div className={`flex flex-col flex-1 transition-all duration-300 ${sidebarOpen ? 'lg:ml-64' : 'ml-0'} ${thinkingPanel !== null ? 'lg:mr-[300px]' : ''} h-screen`}>
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-2 sm:p-4 pt-[70px] md:pt-[80px] pb-[120px] md:pb-[140px] scrollbar-thin scrollbar-thumb-black scrollbar-track-black">
+      <div className="flex-1 overflow-y-auto p-2 sm:p-4 pt-[70px] md:pt-[80px] pb-[120px] md:pb-[140px] scrollbar-thin scrollbar-thumb-black scrollbar-track-black">
         <div className="max-w-[900px] mx-auto space-y-4">
           {messages.length === 0 && !isLoading && (
             <div className="flex items-center justify-center min-h-[60vh]">

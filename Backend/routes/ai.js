@@ -32,7 +32,7 @@ const MODELS = {
   'qwen-32b': 'qwen/qwen3-32b',
   'claude-opus': 'anthropic/claude-opus-4-5',
   'llm-council': 'council',
-  'bytez-image': 'google/imagen-4.0-ultra-generate-001',
+  'bytez-image': 'stabilityai/stable-diffusion-xl-base-1.0',
   'bytez-video': 'ali-vilab/text-to-video-ms-1.7b',
   'bytez-audio': 'suno/bark-small',
   'bytez-music': 'facebook/musicgen-stereo-small'
@@ -423,16 +423,7 @@ router.post('/chat', upload.array('files'), async (req, res) => {
 `);
       const cleanPrompt = message.replace(/^\[.*?:\s*/, '').replace(/\]$/, '').trim();
       const bytezModel = bytez.model(MODELS[model]);
-      let retries = 3;
-      let output, error;
-      while (retries > 0) {
-        const result = await bytezModel.run(cleanPrompt);
-        error = result.error;
-        output = result.output;
-        if (!error) break;
-        retries--;
-        if (retries > 0) await new Promise(resolve => setTimeout(resolve, 2000));
-      }
+      const { error, output } = await bytezModel.run(cleanPrompt);
       if (error) throw new Error(error);
       fullResponse = `<div class="media-container" style="position:relative;"><img src="${output}" style="max-width:100%; border-radius:8px;"/><button data-download data-url="${output}" data-filename="image.png" style="position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.7); padding:8px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:none; cursor:pointer;" title="Download Image"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></button></div>`;
       res.write(`data: ${JSON.stringify({ content: fullResponse })}
@@ -446,16 +437,7 @@ router.post('/chat', upload.array('files'), async (req, res) => {
 `);
       const cleanPrompt = message.replace(/^\[.*?:\s*/, '').replace(/\]$/, '').trim();
       const bytezModel = bytez.model(MODELS[model]);
-      let retries = 3;
-      let output, error;
-      while (retries > 0) {
-        const result = await bytezModel.run(cleanPrompt);
-        error = result.error;
-        output = result.output;
-        if (!error) break;
-        retries--;
-        if (retries > 0) await new Promise(resolve => setTimeout(resolve, 2000));
-      }
+      const { error, output } = await bytezModel.run(cleanPrompt);
       if (error) throw new Error(error);
       fullResponse = `<div class="media-container" style="position:relative;"><video controls src="${output}" style="max-width:100%; border-radius:8px;"></video><button data-download data-url="${output}" data-filename="video.mp4" style="position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.7); padding:8px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:none; cursor:pointer;" title="Download Video"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></button></div>`;
       res.write(`data: ${JSON.stringify({ content: fullResponse })}
@@ -469,16 +451,7 @@ router.post('/chat', upload.array('files'), async (req, res) => {
 `);
       const cleanPrompt = message.replace(/^\[.*?:\s*/, '').replace(/\]$/, '').trim();
       const bytezModel = bytez.model(MODELS[model]);
-      let retries = 3;
-      let output, error;
-      while (retries > 0) {
-        const result = await bytezModel.run(cleanPrompt);
-        error = result.error;
-        output = result.output;
-        if (!error) break;
-        retries--;
-        if (retries > 0) await new Promise(resolve => setTimeout(resolve, 2000));
-      }
+      const { error, output } = await bytezModel.run(cleanPrompt);
       if (error) throw new Error(error);
       fullResponse = `<div class="media-container" style="position:relative;"><audio controls src="${output}" style="max-width:100%;"></audio><button data-download data-url="${output}" data-filename="audio.mp3" style="position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.7); padding:8px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:none; cursor:pointer;" title="Download Audio"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></button></div>`;
       res.write(`data: ${JSON.stringify({ content: fullResponse })}
@@ -492,7 +465,7 @@ router.post('/chat', upload.array('files'), async (req, res) => {
         role: m.role,
         content: m.content
       }));
-      const { error, output } = await bytezModel.run(bytezMessages, { max_tokens: 8000 });
+      const { error, output } = await bytezModel.run(bytezMessages);
       if (error) throw new Error(error);
       
       if (typeof output === 'object' && output.content) {
@@ -514,16 +487,7 @@ router.post('/chat', upload.array('files'), async (req, res) => {
 `);
       const cleanPrompt = message.replace(/^\[.*?:\s*/, '').replace(/\]$/, '').trim();
       const bytezModel = bytez.model(MODELS[model]);
-      let retries = 3;
-      let output, error;
-      while (retries > 0) {
-        const result = await bytezModel.run(cleanPrompt);
-        error = result.error;
-        output = result.output;
-        if (!error) break;
-        retries--;
-        if (retries > 0) await new Promise(resolve => setTimeout(resolve, 2000));
-      }
+      const { error, output } = await bytezModel.run(cleanPrompt);
       if (error) throw new Error(error);
       fullResponse = `<div class="media-container" style="position:relative;"><audio controls src="${output}" style="max-width:100%;"></audio><button data-download data-url="${output}" data-filename="music.mp3" style="position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.7); padding:8px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:none; cursor:pointer;" title="Download Music"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></button></div>`;
       res.write(`data: ${JSON.stringify({ content: fullResponse })}
