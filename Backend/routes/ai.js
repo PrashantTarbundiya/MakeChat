@@ -187,13 +187,13 @@ router.post('/chat', upload.array('files'), async (req, res) => {
 
     // Handle LLM Council mode
     if (model === 'llm-council') {
-      res.write(`data: ${JSON.stringify({ content: '### 🏛️ LLM Council - Stage 1: Gathering Opinions\n\n' })}
+      res.write(`data: ${JSON.stringify({ content: '### 🏛️ LLM Council - Stage 1: Initial Opinions\n\n' })}
 
 `);
       
       const councilResponses = [];
       
-      // Stage 1: Get responses from all council members
+      // Stage 1: Get initial responses from all council members
       for (const councilModel of COUNCIL_MODELS) {
         res.write(`data: ${JSON.stringify({ content: `**${councilModel.toUpperCase()}** is thinking...\n` })}
 
@@ -231,56 +231,61 @@ router.post('/chat', upload.array('files'), async (req, res) => {
 `);
       }
       
-      // Stage 2: Review and rank
-      res.write(`data: ${JSON.stringify({ content: '\n### 🔍 Stage 2: Peer Review\n\n' })}
+      // Stage 2: Debate - Each model reviews all other responses and provides critique
+      res.write(`data: ${JSON.stringify({ content: '\n### 💬 Stage 2: Council Debate\n\n' })}
 
 `);
       
-      const rankings = [];
+      const debates = [];
       for (let i = 0; i < councilResponses.length; i++) {
-        const reviewer = councilResponses[i];
-        const othersAnonymized = councilResponses
-          .filter((_, idx) => idx !== i)
-          .map((r, idx) => `Response ${idx + 1}: ${r.response}`)
-          .join('\n\n');
+        const debater = councilResponses[i];
+        const allResponses = councilResponses
+          .map((r, idx) => `**${r.model.toUpperCase()}:**\n${r.response}`)
+          .join('\n\n---\n\n');
         
-        const reviewPrompt = `You are reviewing responses to: "${userMessage}"\n\nHere are the responses:\n${othersAnonymized}\n\nRank these responses from best to worst (1 being best) based on accuracy and insight. Respond with just the rankings like: 1,2,3`;
+        const debatePrompt = `You are ${debater.model.toUpperCase()} in an LLM Council debate.\n\nOriginal question: "${userMessage}"\n\nHere are all council members' responses:\n\n${allResponses}\n\nNow provide your analysis: What are the strengths and weaknesses of each response? What insights are missing? Keep it concise (2-3 sentences per response).`;
         
-        let ranking = '';
-        if (reviewer.model === 'gemini-pro') {
-          const result = await genAI.models.generateContent({ model: 'gemini-2.5-flash', contents: [{ role: 'user', parts: [{ text: reviewPrompt }] }] });
-          ranking = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        } else if (reviewer.model === 'grok-fast') {
+        res.write(`data: ${JSON.stringify({ content: `**${debater.model.toUpperCase()}** is analyzing...\n` })}
+
+`);
+        
+        let debate = '';
+        if (debater.model === 'gemini-pro') {
+          const result = await genAI.models.generateContent({ model: 'gemini-2.5-flash', contents: [{ role: 'user', parts: [{ text: debatePrompt }] }] });
+          debate = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        } else if (debater.model === 'grok-fast') {
           const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: MODELS[reviewer.model], messages: [{ role: 'user', content: reviewPrompt }] })
+            body: JSON.stringify({ model: MODELS[debater.model], messages: [{ role: 'user', content: debatePrompt }] })
           });
           const data = await resp.json();
-          ranking = data.choices?.[0]?.message?.content || '';
+          debate = data.choices?.[0]?.message?.content || '';
         } else {
           const completion = await groq.chat.completions.create({
-            messages: [{ role: 'user', content: reviewPrompt }],
-            model: MODELS[reviewer.model],
-            temperature: 0.5,
-            max_completion_tokens: 100
+            messages: [{ role: 'user', content: debatePrompt }],
+            model: MODELS[debater.model],
+            temperature: 0.7,
+            max_completion_tokens: 1024
           });
-          ranking = completion.choices[0]?.message?.content || '';
+          debate = completion.choices[0]?.message?.content || '';
         }
-        rankings.push(ranking);
-      }
-      
-      res.write(`data: ${JSON.stringify({ content: 'Reviews collected\n' })}
+        
+        debates.push({ model: debater.model, debate });
+        res.write(`data: ${JSON.stringify({ content: `✓ ${debater.model.toUpperCase()} analyzed\n` })}
 
 `);
+      }
       
-      // Stage 3: Chairman produces final response
-      res.write(`data: ${JSON.stringify({ content: '\n### 👔 Stage 3: Chairman\'s Final Response\n\n' })}
+      // Stage 3: Chairman synthesizes everything
+      res.write(`data: ${JSON.stringify({ content: '\n### 👔 Stage 3: Chairman\'s Synthesis\n\n' })}
 
 `);
       
       const allResponses = councilResponses.map((r, i) => `**${r.model.toUpperCase()}:**\n${r.response}`).join('\n\n---\n\n');
-      const chairmanPrompt = `You are the Chairman of an LLM Council. The user asked: "${userMessage}"\n\nHere are the responses from council members:\n\n${allResponses}\n\nBased on these responses and peer reviews, provide a comprehensive final answer that synthesizes the best insights.`;
+      const allDebates = debates.map((d, i) => `**${d.model.toUpperCase()}\'s Analysis:**\n${d.debate}`).join('\n\n---\n\n');
+      
+      const chairmanPrompt = `You are the Chairman of an LLM Council. The user asked: "${userMessage}"\n\n## Initial Responses:\n${allResponses}\n\n## Council Debate & Analysis:\n${allDebates}\n\nBased on all responses and the debate analysis, provide a comprehensive final answer that:\n1. Synthesizes the best insights from all members\n2. Addresses weaknesses identified in the debate\n3. Provides a complete, accurate answer to the user's question`;
       
       const chairmanResp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',

@@ -29,6 +29,7 @@ function App({ user, isShared = false }) {
 
   const messagesEndRef = useRef(null);
   const abortControllerRef = useRef(null);
+  const lastUserMessageRef = useRef(null);
 
   const handleSendMessage = async (message, files, model) => {
     // Fork shared chat on first message
@@ -139,6 +140,10 @@ function App({ user, isShared = false }) {
     
     setMessages(prev => [...prev, { role: 'user', content: cleanMessage + uploadedFileInfo, mode: isSearch ? 'search' : isThink ? 'think' : isCanvas ? 'canvas' : 'normal', filePublicId: uploadedFilePublicId }]);
 
+    setTimeout(() => {
+      lastUserMessageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+
     abortControllerRef.current = new AbortController();
 
     try {
@@ -204,7 +209,21 @@ function App({ user, isShared = false }) {
       // Store thinking if present
       const hasThinking = extractedThinking && extractedThinking.trim().length > 0;
       
-      setMessages(prev => [...prev, { role: 'assistant', content: cleanResponse, model, mode: isSearch ? 'search' : isThink ? 'think' : isCanvas ? 'canvas' : 'normal', thinking: hasThinking ? extractedThinking : undefined }]);
+      setMessages(prev => {
+        const lastMsg = prev[prev.length - 1];
+        const versions = lastMsg?.versions || [];
+        versions.push(cleanResponse);
+        
+        return [...prev, { 
+          role: 'assistant', 
+          content: cleanResponse, 
+          model, 
+          mode: isSearch ? 'search' : isThink ? 'think' : isCanvas ? 'canvas' : 'normal', 
+          thinking: hasThinking ? extractedThinking : undefined,
+          versions,
+          currentVersion: versions.length - 1
+        }];
+      });
       setCurrentResponse('');
     } catch (error) {
       if (error.name === 'AbortError') {
@@ -229,11 +248,106 @@ function App({ user, isShared = false }) {
     }
   };
 
-  const handleRegenerate = () => {
+  const handleRegenerate = async () => {
     if (messages.length >= 2) {
       const lastUserMsg = messages[messages.length - 2];
+      const lastAssistantMsg = messages[messages.length - 1];
+      
+      // Store current response as a version
+      const versions = lastAssistantMsg.versions || [lastAssistantMsg.content];
+      
+      // Remove last assistant message and regenerate without adding user message again
       setMessages(prev => prev.slice(0, -1));
-      handleSendMessage(lastUserMsg.content, [], selectedModel);
+      
+      // Call the API directly without adding user message
+      setIsLoading(true);
+      setCurrentResponse('');
+      abortControllerRef.current = new AbortController();
+
+      try {
+        const token = localStorage.getItem('token');
+        const formData = new FormData();
+        formData.append('message', lastUserMsg.content);
+        formData.append('model', lastAssistantMsg.model || selectedModel);
+        formData.append('userId', user?.id || 'guest');
+        formData.append('mode', lastAssistantMsg.mode || 'normal');
+        if (token) formData.append('token', token);
+
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/ai/chat`, {
+          method: 'POST',
+          body: formData,
+          signal: abortControllerRef.current.signal,
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let fullResponse = '';
+        let thinkingText = '';
+        const isMediaModel = ['bytez-image', 'bytez-video', 'bytez-audio', 'bytez-music'].includes(lastAssistantMsg.model || selectedModel);
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') break;
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.reasoning) thinkingText += parsed.reasoning;
+                if (isMediaModel && parsed.content?.includes('media-container')) {
+                  fullResponse = parsed.content;
+                } else if (parsed.content) {
+                  fullResponse += parsed.content;
+                }
+                setCurrentResponse(fullResponse);
+              } catch (e) {}
+            }
+          }
+        }
+
+        let cleanResponse = fullResponse.replace(/<\d+\/\d+>/g, '').trim();
+        let extractedThinking = thinkingText;
+        
+        const thinkMatch = cleanResponse.match(/<think>([\s\S]*?)<\/think>/);
+        if (thinkMatch) {
+          extractedThinking = thinkMatch[1].trim();
+          cleanResponse = cleanResponse.replace(/<think>[\s\S]*?<\/think>/, '').trim();
+        }
+        
+        const hasThinking = extractedThinking && extractedThinking.trim().length > 0;
+        
+        // Add new version
+        const newVersions = [...versions, cleanResponse];
+        
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: cleanResponse, 
+          model: lastAssistantMsg.model || selectedModel, 
+          mode: lastAssistantMsg.mode || 'normal', 
+          thinking: hasThinking ? extractedThinking : undefined,
+          versions: newVersions,
+          currentVersion: newVersions.length - 1
+        }]);
+        setCurrentResponse('');
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          if (currentResponse) {
+            const cleanResponse = currentResponse.replace(/<\d+\/\d+>/g, '').trim();
+            setMessages(prev => [...prev, { role: 'assistant', content: cleanResponse + ' [Stopped]', model: lastAssistantMsg.model || selectedModel }]);
+          }
+          setCurrentResponse('');
+        } else {
+          console.error('Error:', error);
+        }
+      } finally {
+        setIsLoading(false);
+        abortControllerRef.current = null;
+      }
     }
   };
 
@@ -250,6 +364,18 @@ function App({ user, isShared = false }) {
     if (updatedMessages[index].role === 'user') {
       handleSendMessage(editText, [], selectedModel);
     }
+  };
+
+  const handleVersionChange = (index, newVersion) => {
+    setMessages(prev => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        currentVersion: newVersion,
+        content: updated[index].versions[newVersion]
+      };
+      return updated;
+    });
   };
 
   const handleCopy = (text, index) => {
@@ -269,6 +395,7 @@ function App({ user, isShared = false }) {
     setMessages([]);
     setCurrentResponse('');
     setCurrentChatId(null);
+    setThinkingPanel(null);
   };
 
   const handleSelectChat = async (chatId) => {
@@ -278,6 +405,7 @@ function App({ user, isShared = false }) {
       setSelectedModel(chatId);
       return;
     }
+    setThinkingPanel(null);
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/chat/${chatId}`, {
@@ -410,11 +538,12 @@ function App({ user, isShared = false }) {
           )}
           {messages.map((msg, i) => {
             const isLastAssistant = msg.role === 'assistant' && i === messages.length - 1;
+            const isLastUser = msg.role === 'user' && i === messages.length - 1;
             
             return (
-              <div key={i} className="group">
+              <div key={i} className="group" ref={isLastUser ? lastUserMessageRef : null}>
                 <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`space-y-2 ${msg.role === 'user' ? 'max-w-[80%]' : 'max-w-[95%]'}`}>
+                  <div className={`space-y-2 ${msg.role === 'user' ? 'max-w-[80%]' : msg.mode === 'canvas' ? 'w-full' : 'max-w-[95%]'}`}>
                     {editingIndex === i ? (
                       <EditMessage
                         value={editText}
@@ -443,7 +572,13 @@ function App({ user, isShared = false }) {
                     ) : msg.role === 'assistant' && msg.mode === 'search' ? (
                       <SearchView content={msg.content} />
                     ) : (
-                      <MessageBubble content={msg.content} role={msg.role} />
+                      <MessageBubble 
+                        content={msg.content} 
+                        role={msg.role} 
+                        versions={msg.versions}
+                        currentVersion={msg.currentVersion || 0}
+                        onVersionChange={(v) => handleVersionChange(i, v)}
+                      />
                     )}
                     {msg.thinking && msg.role === 'assistant' && editingIndex !== i && (
                       <button
@@ -464,6 +599,9 @@ function App({ user, isShared = false }) {
                     onEdit={() => handleEdit(i)}
                     onCopy={() => handleCopy(msg.content, i)}
                     isCopied={copiedIndex === i}
+                    versions={msg.versions}
+                    currentVersion={msg.currentVersion || 0}
+                    onVersionChange={(v) => handleVersionChange(i, v)}
                   />
                 )}
               </div>
@@ -481,7 +619,7 @@ function App({ user, isShared = false }) {
             <div className="flex justify-start">
               <div className="max-w-[95%]">
                 {messages[messages.length - 1]?.mode === 'canvas' ? (
-                  <CanvasView content={currentResponse} />
+                  <MessageBubble content={currentResponse} role="assistant" />
                 ) : messages[messages.length - 1]?.mode === 'think' ? (
                   <ThinkingView content={currentResponse} />
                 ) : messages[messages.length - 1]?.mode === 'search' ? (

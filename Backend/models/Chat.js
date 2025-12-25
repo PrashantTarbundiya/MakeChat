@@ -8,6 +8,10 @@ const chatSchema = new mongoose.Schema({
     content: { type: String, required: true },
     mode: { type: String, default: 'normal' },
     thinking: { type: String },
+    model: { type: String },
+    filePublicId: { type: String },
+    versions: [{ type: String }],
+    currentVersion: { type: Number, default: 0 },
     timestamp: { type: Date, default: Date.now }
   }],
   uploadedFiles: [{

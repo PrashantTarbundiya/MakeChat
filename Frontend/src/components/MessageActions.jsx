@@ -7,7 +7,10 @@ export const MessageActions = ({
   onRegenerate, 
   onEdit, 
   onCopy, 
-  isCopied
+  isCopied,
+  versions,
+  currentVersion,
+  onVersionChange
 }) => {
   if (role === 'user') {
     return (
@@ -26,6 +29,25 @@ export const MessageActions = ({
   if (role === 'assistant' && !isLoading) {
     return (
       <div className="flex gap-2 mt-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+        {versions && versions.length > 1 && (
+          <div className="flex items-center gap-1 px-2 sm:px-3 py-1 bg-white/20 text-white rounded-lg text-xs sm:text-sm">
+            <button
+              onClick={() => onVersionChange(currentVersion - 1)}
+              disabled={currentVersion === 0}
+              className="hover:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed px-1 rounded"
+            >
+              ←
+            </button>
+            <span className="text-xs">{currentVersion + 1}/{versions.length}</span>
+            <button
+              onClick={() => onVersionChange(currentVersion + 1)}
+              disabled={currentVersion === versions.length - 1}
+              className="hover:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed px-1 rounded"
+            >
+              →
+            </button>
+          </div>
+        )}
         {isLast && (
           <button
             onClick={onRegenerate}
