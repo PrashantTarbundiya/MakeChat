@@ -63,7 +63,7 @@ export const MessageBubble = ({ content, role }) => {
     if (mediaRef.current) {
       const buttons = mediaRef.current.querySelectorAll('button[data-download]');
       buttons.forEach(btn => {
-        btn.onclick = (e) => {
+        btn.onclick = async (e) => {
           e.preventDefault();
           const url = btn.getAttribute('data-url');
           const filename = btn.getAttribute('data-filename');
@@ -71,17 +71,21 @@ export const MessageBubble = ({ content, role }) => {
           const fileType = btn.getAttribute('data-type');
           
           if (fileContent) {
-            handleDownloadFile(fileContent, filename, fileType);
-          } else {
-            fetch(url)
-              .then(r => r.blob())
-              .then(blob => {
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                a.download = filename;
-                a.click();
-                URL.revokeObjectURL(a.href);
-              });
+            const decodedContent = decodeURIComponent(fileContent);
+            handleDownloadFile(decodedContent, filename, fileType);
+          } else if (url) {
+            try {
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = filename;
+              a.target = '_blank';
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+            } catch (error) {
+              console.error('Download failed:', error);
+              window.open(url, '_blank');
+            }
           }
         };
       });
