@@ -6,7 +6,7 @@ export const Settings = ({ user, isOpen, setIsOpen, onLogout }) => {
   const [newMemory, setNewMemory] = useState('');
 
   useEffect(() => {
-    if (isOpen && user.id !== 'guest') {
+    if (isOpen && user?.id && user.id !== 'guest') {
       fetchSettings();
     }
   }, [isOpen, user]);
@@ -14,9 +14,20 @@ export const Settings = ({ user, isOpen, setIsOpen, onLogout }) => {
   const fetchSettings = async () => {
     try {
       const token = localStorage.getItem('token');
+      if (!token) return;
+
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/memory`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('cachedChats');
+        window.location.href = '/login';
+        return;
+      }
+
       if (response.ok) {
         const data = await response.json();
         setMemories(data.memories || []);
@@ -30,6 +41,8 @@ export const Settings = ({ user, isOpen, setIsOpen, onLogout }) => {
     if (!newMemory.trim()) return;
     try {
       const token = localStorage.getItem('token');
+      if (!token) return;
+
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/memory/add`, {
         method: 'POST',
         headers: {
@@ -38,6 +51,15 @@ export const Settings = ({ user, isOpen, setIsOpen, onLogout }) => {
         },
         body: JSON.stringify({ memory: newMemory })
       });
+
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('cachedChats');
+        window.location.href = '/login';
+        return;
+      }
+
       if (response.ok) {
         setNewMemory('');
         fetchSettings();
@@ -50,11 +72,24 @@ export const Settings = ({ user, isOpen, setIsOpen, onLogout }) => {
   const deleteMemory = async (index) => {
     try {
       const token = localStorage.getItem('token');
-      await fetch(`${import.meta.env.VITE_API_URL}/api/memory/${index}`, {
+      if (!token) return;
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/memory/${index}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      fetchSettings();
+
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('cachedChats');
+        window.location.href = '/login';
+        return;
+      }
+
+      if (response.ok) {
+        fetchSettings();
+      }
     } catch (error) {
       console.error('Failed to delete memory:', error);
     }
@@ -64,17 +99,30 @@ export const Settings = ({ user, isOpen, setIsOpen, onLogout }) => {
     if (!confirm('Delete all personalized memories?')) return;
     try {
       const token = localStorage.getItem('token');
-      await fetch(`${import.meta.env.VITE_API_URL}/api/memory/clear`, {
+      if (!token) return;
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/memory/clear`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      fetchSettings();
+
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('cachedChats');
+        window.location.href = '/login';
+        return;
+      }
+
+      if (response.ok) {
+        fetchSettings();
+      }
     } catch (error) {
       console.error('Failed to clear memories:', error);
     }
   };
 
-  if (user.id === 'guest' || !isOpen) return null;
+  if (!user || user.id === 'guest' || !isOpen) return null;
 
   return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">

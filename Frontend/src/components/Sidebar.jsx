@@ -13,7 +13,7 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
   const [modelsOpen, setModelsOpen] = useState(false);
 
   useEffect(() => {
-    if (user.id !== 'guest') {
+    if (user?.id && user.id !== 'guest') {
       fetchChats();
     }
   }, [user, refreshTrigger]);
@@ -34,14 +34,32 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
 
       // Then fetch fresh data
       const token = localStorage.getItem('token');
+      if (!token) {
+        console.log('No token found, skipping chat fetch');
+        return;
+      }
+
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/chat/history`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      
+      if (response.status === 401) {
+        // Token is invalid or expired
+        console.log('Token expired or invalid, clearing auth data');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('cachedChats');
+        window.location.href = '/login';
+        return;
+      }
+      
       if (response.ok) {
         const data = await response.json();
         const recentChats = data.slice(0, 4); // Keep only last 4
         setChats(data);
         localStorage.setItem('cachedChats', JSON.stringify(recentChats));
+      } else {
+        console.error('Failed to fetch chats:', response.status, response.statusText);
       }
     } catch (error) {
       console.error('Failed to fetch chats:', error);
@@ -51,16 +69,29 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
   const deleteChat = async (chatId) => {
     try {
       const token = localStorage.getItem('token');
-      await fetch(`${import.meta.env.VITE_API_URL}/api/chat/${chatId}`, {
+      if (!token) return;
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/chat/${chatId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      fetchChats();
-      if (currentChatId === chatId) onNewChat();
-      setDeleteConfirm(null);
-      // Update cache
-      const updatedChats = chats.filter(c => c._id !== chatId).slice(0, 4);
-      localStorage.setItem('cachedChats', JSON.stringify(updatedChats));
+
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('cachedChats');
+        window.location.href = '/login';
+        return;
+      }
+
+      if (response.ok) {
+        fetchChats();
+        if (currentChatId === chatId) onNewChat();
+        setDeleteConfirm(null);
+        // Update cache
+        const updatedChats = chats.filter(c => c._id !== chatId).slice(0, 4);
+        localStorage.setItem('cachedChats', JSON.stringify(updatedChats));
+      }
     } catch (error) {
       console.error('Failed to delete chat:', error);
     }
@@ -76,22 +107,35 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
     if (!editTitle.trim()) return;
     try {
       const token = localStorage.getItem('token');
-      await fetch(`${import.meta.env.VITE_API_URL}/api/chat/${chatId}/rename`, {
+      if (!token) return;
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/chat/${chatId}/rename`, {
         method: 'PUT',
-        headers: { 
+        headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ title: editTitle })
       });
-      fetchChats();
-      setEditingId(null);
-      // Update cache - move renamed chat to top
-      const renamedChat = chats.find(c => c._id === chatId);
-      if (renamedChat) {
-        const filteredChats = chats.filter(c => c._id !== chatId);
-        const updatedChats = [{ ...renamedChat, title: editTitle, updatedAt: new Date().toISOString() }, ...filteredChats].slice(0, 4);
-        localStorage.setItem('cachedChats', JSON.stringify(updatedChats));
+
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('cachedChats');
+        window.location.href = '/login';
+        return;
+      }
+
+      if (response.ok) {
+        fetchChats();
+        setEditingId(null);
+        // Update cache - move renamed chat to top
+        const renamedChat = chats.find(c => c._id === chatId);
+        if (renamedChat) {
+          const filteredChats = chats.filter(c => c._id !== chatId);
+          const updatedChats = [{ ...renamedChat, title: editTitle, updatedAt: new Date().toISOString() }, ...filteredChats].slice(0, 4);
+          localStorage.setItem('cachedChats', JSON.stringify(updatedChats));
+        }
       }
     } catch (error) {
       console.error('Failed to rename chat:', error);
@@ -129,7 +173,7 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2">
-          {user.id === 'guest' ? (
+          {!user || user.id === 'guest' ? (
             <div className="text-gray-400 text-sm text-center py-4">
               Login to save chat history
             </div>
@@ -165,14 +209,29 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
                         <button onClick={(e) => { e.stopPropagation(); startRename(chat); }} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-white/10 text-sm text-left">
                           <Edit2 className="w-4 h-4" /> Rename
                         </button>
-                        <button onClick={async (e) => { 
-                          e.stopPropagation(); 
+                        <button onClick={async (e) => {
+                          e.stopPropagation();
                           try {
                             const token = localStorage.getItem('token');
+                            if (!token || !user || user.id === 'guest') {
+                              // Redirect to login if not authenticated
+                              window.location.href = '/login';
+                              return;
+                            }
+
                             const response = await fetch(`${import.meta.env.VITE_API_URL}/api/chat/${chat._id}/share`, {
                               method: 'POST',
                               headers: { 'Authorization': `Bearer ${token}` }
                             });
+
+                            if (response.status === 401) {
+                              localStorage.removeItem('token');
+                              localStorage.removeItem('user');
+                              localStorage.removeItem('cachedChats');
+                              window.location.href = '/login';
+                              return;
+                            }
+
                             if (response.ok) {
                               const data = await response.json();
                               const shareUrl = `${window.location.origin}/share/${data.shareToken}`;
@@ -180,12 +239,14 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
                                 await navigator.share({ url: shareUrl, title: chat.title });
                               } else {
                                 navigator.clipboard.writeText(shareUrl);
+                                // Show a toast or alert that the link was copied
+                                alert('Share link copied to clipboard!');
                               }
                             }
                           } catch (error) {
                             console.error('Share failed:', error);
                           }
-                          setMenuOpen(null); 
+                          setMenuOpen(null);
                         }} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-white/10 text-sm text-left">
                           <Share2 className="w-4 h-4" /> Share
                         </button>
@@ -202,7 +263,7 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
         </div>
 
         <div className="p-3 sm:p-4 border-t border-gray-700">
-          {user.id === 'guest' ? (
+          {!user || user.id === 'guest' ? (
             <div className="space-y-2">
               <a href="/login" className="w-full block text-center px-3 sm:px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors text-white text-sm">
                 Login
@@ -220,10 +281,10 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
                 <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-full object-cover" referrerPolicy="no-referrer" />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm">
-                  {user.name?.charAt(0).toUpperCase()}
+                  {user.name?.charAt(0)?.toUpperCase() || 'U'}
                 </div>
               )}
-              <span className="text-sm flex-1 text-left truncate">{user.name}</span>
+              <span className="text-sm flex-1 text-left truncate">{user.name || 'User'}</span>
             </button>
           )}
         </div>

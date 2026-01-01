@@ -32,6 +32,12 @@ function App({ user, isShared = false }) {
   const lastUserMessageRef = useRef(null);
 
   const handleSendMessage = async (message, files, model) => {
+    // Check if user is authenticated when trying to send a message
+    if (!user || user.id === 'guest' || !localStorage.getItem('token')) {
+      window.location.href = '/login';
+      return;
+    }
+
     // Fork shared chat on first message
     if (isShared && !isForked && user) {
       try {
@@ -392,6 +398,12 @@ function App({ user, isShared = false }) {
   };
 
   const handleNewChat = () => {
+    // Check if user is authenticated when trying to create a new chat
+    if (!user || user.id === 'guest' || !localStorage.getItem('token')) {
+      window.location.href = '/login';
+      return;
+    }
+
     setMessages([]);
     setCurrentResponse('');
     setCurrentChatId(null);
@@ -401,22 +413,43 @@ function App({ user, isShared = false }) {
   const handleSelectChat = async (chatId) => {
     const specialModels = ['bytez-image', 'bytez-video', 'bytez-audio', 'bytez-music', 'llm-council'];
     if (specialModels.includes(chatId)) {
-      handleNewChat();
+      // For special models, just clear the chat without authentication check
+      setMessages([]);
+      setCurrentResponse('');
+      setCurrentChatId(null);
+      setThinkingPanel(null);
       setSelectedModel(chatId);
       return;
     }
     setThinkingPanel(null);
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Please login to access chats');
+        return;
+      }
+
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/chat/${chatId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('cachedChats');
+        window.location.href = '/login';
+        return;
+      }
+
       if (response.ok) {
         const chat = await response.json();
         setMessages(chat.messages);
         setCurrentChatId(chatId);
         toast.remove();
         toast.success('Chat loaded successfully');
+      } else {
+        toast.remove();
+        toast.error('Failed to load chat');
       }
     } catch (error) {
       console.error('Failed to load chat:', error);
@@ -430,6 +463,8 @@ function App({ user, isShared = false }) {
     
     try {
       const token = localStorage.getItem('token');
+      if (!token) return;
+
       const messagesToSave = currentResponse && isLoading
         ? [...messages, { role: 'assistant', content: currentResponse + ' [Incomplete]', model: selectedModel }]
         : messages;
@@ -445,6 +480,15 @@ function App({ user, isShared = false }) {
           title: messages[0]?.content.slice(0, 50) || 'New Chat'
         })
       });
+
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('cachedChats');
+        window.location.href = '/login';
+        return;
+      }
+
       if (response.ok) {
         const chat = await response.json();
         if (!currentChatId) setCurrentChatId(chat._id);
@@ -519,18 +563,19 @@ function App({ user, isShared = false }) {
             <div className="flex items-center justify-center min-h-[60vh]">
               <div className="text-center px-4">
                 <h1 className="text-2xl sm:text-3xl font-bold text-white mb-3">
-                  {[
+                  {user?.name ? [
                     `Hello, ${user.name}! 👋`,
                     `Welcome back, ${user.name}! ✨`,
                     `Hi ${user.name}! Ready to chat? 💬`,
                     `Hey ${user.name}! What can I help you with? 🚀`,
-                    `Good to see you, ${user.name}! 😊`,
+                    `Good to see you, ${user.name}! 😊`
+                  ][Math.floor(Math.random() * 5)] : [
                     `Hello! How can I assist you today? 🤖`,
                     `Welcome! Let's create something amazing! 🎨`,
                     `Hi there! What's on your mind? 💭`,
                     `Ready to explore? Let's get started! 🌟`,
                     `Hello! I'm here to help! 💡`
-                  ][Math.floor(Math.random() * 10)]}
+                  ][Math.floor(Math.random() * 5)]}
                 </h1>
                 <p className="text-gray-400 text-sm sm:text-base">Start a conversation or ask me anything</p>
               </div>
