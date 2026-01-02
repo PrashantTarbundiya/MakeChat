@@ -99,28 +99,36 @@ router.post('/chat', upload.array('files'), async (req, res) => {
     
     if (message.startsWith('[Search:')) {
       const query = message.replace(/^\[Search:\s*/, '').replace(/\]$/, '');
-      const searchResults = await performWebSearch(query);
-      
-      if (searchResults) {
-        const searchContext = `\n\nWeb Search Results for "${query}":\n` +
-          searchResults.map((r, i) => 
-            `${i + 1}. ${r.title}\n   ${r.snippet}\n   Source: ${r.url}\n`
-          ).join('\n');
-        userMessage = message + searchContext;
+      try {
+        const searchResults = await performWebSearch(query);
+        
+        if (searchResults) {
+          const searchContext = `\n\nWeb Search Results for "${query}":\n` +
+            searchResults.map((r, i) => 
+              `${i + 1}. ${r.title}\n   ${r.snippet}\n   Source: ${r.url}\n`
+            ).join('\n');
+          userMessage = message + searchContext;
+        }
+      } catch (e) {
+        console.error('Search failed:', e);
       }
     }
     
     if (message.startsWith('[Think:')) {
       const query = message.replace(/^\[Think:\s*/, '').replace(/\]$/, '');
-      const searchResults = await performWebSearch(query);
-      
-      if (searchResults) {
-        const researchContext = `\n\nResearch Data for "${query}":\n` +
-          searchResults.map((r, i) => 
-            `Source ${i + 1}: ${r.title}\n${r.snippet}\nURL: ${r.url}\n`
-          ).join('\n') +
-          '\n\nAnalyze this data deeply with step-by-step reasoning.';
-        userMessage = message + researchContext;
+      try {
+        const searchResults = await performWebSearch(query);
+        
+        if (searchResults) {
+          const researchContext = `\n\nResearch Data for "${query}":\n` +
+            searchResults.map((r, i) => 
+              `Source ${i + 1}: ${r.title}\n${r.snippet}\nURL: ${r.url}\n`
+            ).join('\n') +
+            '\n\nAnalyze this data deeply with step-by-step reasoning.';
+          userMessage = message + researchContext;
+        }
+      } catch (e) {
+        console.error('Think search failed:', e);
       }
     }
     
