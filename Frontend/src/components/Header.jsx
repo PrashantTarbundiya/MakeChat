@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 export const Header = ({ sidebarOpen, setSidebarOpen }) => {
   return (
     <div className="fixed top-0 left-0 right-0 h-[50px] bg-[#1F2023] border-b border-gray-700 flex items-center justify-between px-4 z-50">
@@ -10,8 +12,10 @@ export const Header = ({ sidebarOpen, setSidebarOpen }) => {
             <path d="M3 12h18M3 6h18M3 18h18"/>
           </svg>
         </button>
-        <img src="https://res.cloudinary.com/durcxd0dn/image/upload/v1764748775/cropped_circle_image_no7c6p.png" alt="MakeChat" className="w-6 h-6 rounded-full" />
-        <span className="text-white font-semibold text-sm sm:text-base">MakeChat</span>
+        <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <img src="https://res.cloudinary.com/durcxd0dn/image/upload/v1764748775/cropped_circle_image_no7c6p.png" alt="MakeChat" className="w-6 h-6 rounded-full" />
+          <span className="text-white font-semibold text-sm sm:text-base">MakeChat</span>
+        </Link>
       </div>
       <button className="p-1 hover:bg-white/10 rounded transition-colors text-white">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

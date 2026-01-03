@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import './index.css'
 import App from './App.jsx'
+import LandingPage from './pages/LandingPage.jsx'
 import { Login } from './pages/Login.jsx'
 import { Signup } from './pages/Signup.jsx'
 import { GoogleCallback } from './pages/GoogleCallback.jsx'
@@ -28,11 +29,12 @@ const Root = () => {
     <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
       <BrowserRouter>
         <Routes>
-          <Route path="/login" element={!user ? <Login onLogin={setUser} /> : <Navigate to="/" />} />
-          <Route path="/signup" element={!user ? <Signup onSignup={setUser} /> : <Navigate to="/" />} />
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={!user ? <Login onLogin={setUser} /> : <Navigate to="/chat" />} />
+          <Route path="/signup" element={!user ? <Signup onSignup={setUser} /> : <Navigate to="/chat" />} />
           <Route path="/auth/google/callback" element={<GoogleCallback />} />
           <Route path="/share/:token" element={<App user={user} isShared={true} />} />
-          <Route path="/" element={user ? <App user={user} /> : <Navigate to="/login" />} />
+          <Route path="/chat" element={user ? <App user={user} /> : <Navigate to="/login" />} />
         </Routes>
       </BrowserRouter>
     </GoogleOAuthProvider>
