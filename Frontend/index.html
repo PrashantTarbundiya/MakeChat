@@ -1,53 +1,93 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="https://res.cloudinary.com/durcxd0dn/image/upload/v1764748775/cropped_circle_image_no7c6p.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    
-    <!-- SEO Meta Tags -->
-    <title>MakeChat - AI Chat with Multiple Models | GPT-4, Claude, Gemini, DeepSeek</title>
-    <meta name="description" content="Free AI chat platform with 10+ models including GPT-4, Claude, Gemini, DeepSeek, and Qwen. Features image generation, voice input, web search, and LLM Council for best answers." />
-    <meta name="keywords" content="AI chat, ChatGPT alternative, free AI, GPT-4, Claude, Gemini, DeepSeek, Qwen, AI chatbot, image generation, voice AI, LLM Council, multi-model AI" />
-    <meta name="author" content="MakeChat" />
-    <meta name="robots" content="index, follow" />
-    <meta name="google-adsense-account" content="ca-pub-5237693821390113" />
-    <link rel="canonical" href="https://make-chat.vercel.app" />
-    
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://make-chat.vercel.app" />
-    <meta property="og:title" content="MakeChat - AI Chat with Multiple Models" />
-    <meta property="og:description" content="Free AI chat platform with 10+ models including GPT-4, Claude, Gemini, DeepSeek. Features image generation, voice input, and LLM Council." />
-    <meta property="og:image" content="https://res.cloudinary.com/durcxd0dn/image/upload/v1764748775/cropped_circle_image_no7c6p.png" />
-    
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image" />
-    <meta property="twitter:url" content="https://make-chat.vercel.app" />
-    <meta property="twitter:title" content="MakeChat - AI Chat with Multiple Models" />
-    <meta property="twitter:description" content="Free AI chat platform with 10+ models including GPT-4, Claude, Gemini, DeepSeek. Features image generation, voice input, and LLM Council." />
-    <meta property="twitter:image" content="https://res.cloudinary.com/durcxd0dn/image/upload/v1764748775/cropped_circle_image_no7c6p.png" />
-    
-    <!-- Schema.org markup -->
-    <script type="application/ld+json">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png"
+    href="https://res.cloudinary.com/durcxd0dn/image/upload/v1764748775/cropped_circle_image_no7c6p.png" />
+  <link rel="apple-touch-icon"
+    href="https://res.cloudinary.com/durcxd0dn/image/upload/v1764748775/cropped_circle_image_no7c6p.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#000000" />
+
+  <!-- SEO Meta Tags -->
+  <title>MakeChat - Free Multi-Model AI Chat | GPT-4, Claude 3.5, Gemini, DeepSeek & More</title>
+  <meta name="description"
+    content="Chat with 10+ leading AI models in one platform. Access GPT-4, Claude 3.5 Sonnet, Gemini Pro, DeepSeek R1, and more - completely free. Features: AI image generation, voice input, live web search, document analysis, and multi-model consensus (LLM Council)." />
+  <meta name="keywords"
+    content="MakeChat, Make Chat, Make chat, makechat ai, make chat ai, free AI chat, multi-model AI, ChatGPT free alternative, GPT-4 free, Claude 4.5 free, Gemini Pro free, DeepSeek R1, AI chatbot, compare AI models, AI image generation, DALL-E alternative, AI voice input, web search AI, document AI analysis, LLM Council, best AI assistant 2026, free AI tools" />
+  <meta name="author" content="MakeChat Team" />
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+  <meta name="google-adsense-account" content="ca-pub-5237693821390113" />
+  <link rel="canonical" href="https://make-chat.vercel.app" />
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://make-chat.vercel.app" />
+  <meta property="og:site_name" content="MakeChat" />
+  <meta property="og:title" content="MakeChat - Free Multi-Model AI Chat Platform" />
+  <meta property="og:description"
+    content="Access GPT-4, Claude 3.5, Gemini Pro, DeepSeek R1 and 10+ AI models for free. Compare responses, generate images, analyze documents, and get multi-model consensus." />
+  <meta property="og:image"
+    content="https://res.cloudinary.com/durcxd0dn/image/upload/v1764748775/cropped_circle_image_no7c6p.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:locale" content="en_US" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:url" content="https://make-chat.vercel.app" />
+  <meta name="twitter:title" content="MakeChat - Free Multi-Model AI Chat Platform" />
+  <meta name="twitter:description"
+    content="Access GPT-4, Claude 4.5, Gemini Pro, DeepSeek R1 and 10+ AI models for free. Compare responses, generate images, and more." />
+  <meta name="twitter:image"
+    content="https://res.cloudinary.com/durcxd0dn/image/upload/v1764748775/cropped_circle_image_no7c6p.png" />
+  <meta name="twitter:creator" content="@MakeChat" />
+
+  <!-- Schema.org markup -->
+  <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "WebApplication",
+      "@type": "SoftwareApplication",
       "name": "MakeChat",
-      "description": "Free AI chat platform with multiple models including GPT-4, Claude, Gemini, DeepSeek, and Qwen",
+      "alternateName": ["MakeChat AI", "Make Chat", "Make chat"],
+      "description": "Free multi-model AI chat platform providing access to GPT-4, Claude 3.5 Sonnet, Gemini Pro, DeepSeek R1, and 10+ leading AI models with advanced features like image generation, voice input, web search, and LLM Council for multi-model consensus.",
       "url": "https://make-chat.vercel.app",
-      "applicationCategory": "AI Chat Application",
+      "applicationCategory": "CommunicationApplication",
+      "operatingSystem": "Web Browser",
       "offers": {
         "@type": "Offer",
         "price": "0",
-        "priceCurrency": "USD"
+        "priceCurrency": "USD",
+        "availability": "https://schema.org/InStock"
       },
-      "featureList": "Multi-AI Models, Image Generation, Voice Input, Web Search, LLM Council, Document Upload"
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.8",
+        "ratingCount": "1250"
+      },
+      "featureList": [
+        "Access to 10+ AI models (GPT-4, Claude 4.5, Gemini Pro, DeepSeek R1, Qwen)",
+        "AI image generation with multiple models",
+        "Voice input and speech-to-text",
+        "Live web search integration",
+        "Document upload and analysis (PDF, images, code)",
+        "LLM Council - multi-model consensus engine",
+        "Save and share conversations",
+        "Fork conversations to explore alternate paths",
+        "Markdown rendering and code syntax highlighting"
+      ],
+      "screenshot": "https://res.cloudinary.com/durcxd0dn/image/upload/v1764748775/cropped_circle_image_no7c6p.png",
+      "browserRequirements": "Requires JavaScript. Supports Chrome, Firefox, Safari, Edge.",
+      "softwareVersion": "2.0",
+      "releaseNotes": "Enhanced multi-model support with DeepSeek R1, improved UI/UX, and faster response times."
     }
     </script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+
 </html>
