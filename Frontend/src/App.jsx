@@ -719,8 +719,8 @@ function App({ user, isShared = false }) {
       </div>
       {thinkingPanel !== null && messages[thinkingPanel]?.thinking && (
         <>
-          <div className="fixed right-0 top-0 h-full w-full sm:w-[300px] bg-[#1F2023] border-l border-gray-700 shadow-2xl z-50 flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-gray-700">
+          <div className="fixed right-0 top-0 h-full w-full sm:w-[300px] bg-black border-l border-white/10 shadow-2xl z-50 flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-white/10">
               <h3 className="text-white font-semibold flex items-center gap-2">
                 <span>💭</span> Thinking Process
               </h3>

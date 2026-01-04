@@ -32,7 +32,7 @@ export const Spotlight = () => {
         translateY: '-50%',
         width: 600,
         height: 600,
-        background: `radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, rgba(0,0,0,0) 70%)`,
+        background: `radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, rgba(0,0,0,0) 70%)`,
         pointerEvents: 'none',
         zIndex: 9999,
         mixBlendMode: 'screen'
