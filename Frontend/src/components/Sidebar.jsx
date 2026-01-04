@@ -42,7 +42,7 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/chat/history`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
+
       if (response.status === 401) {
         // Token is invalid or expired
         console.log('Token expired or invalid, clearing auth data');
@@ -52,7 +52,7 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
         window.location.href = '/login';
         return;
       }
-      
+
       if (response.ok) {
         const data = await response.json();
         const recentChats = data.slice(0, 4); // Keep only last 4
@@ -144,14 +144,13 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
 
   return (
     <>
-      <div className={`fixed left-0 top-0 h-full bg-[#1F2023] text-white transition-transform duration-300 z-40 ${
-        isOpen ? 'translate-x-0' : '-translate-x-full'
-      } w-64 flex flex-col`}>
+      <div className={`fixed left-0 top-0 h-full bg-black text-white transition-transform duration-300 z-40 ${isOpen ? 'translate-x-0' : '-translate-x-full'
+        } w-64 flex flex-col border-r border-white/10`}>
         <div className="h-[50px]"></div>
-        <div className="p-3 sm:p-4 border-b border-gray-700 space-y-2">
+        <div className="p-3 sm:p-4 border-b border-white/10 space-y-2">
           <button
             onClick={onNewChat}
-            className="w-full flex items-center gap-2 px-3 sm:px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-sm"
+            className="w-full flex items-center gap-2 px-3 sm:px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors text-sm font-medium"
           >
             <Plus className="w-4 sm:w-5 h-4 sm:h-5" />
             New Chat
@@ -165,7 +164,7 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
           </button>
           <button
             onClick={() => setModelsOpen(!modelsOpen)}
-            className="w-full flex items-center gap-2 px-3 sm:px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-sm"
+            className="w-full flex items-center gap-2 px-3 sm:px-4 py-2 bg-white/5 hover:bg-white/10 hover:text-emerald-400 rounded-lg transition-colors text-sm"
           >
             <Sparkles className="w-4 sm:w-5 h-4 sm:h-5" />
             Models
@@ -183,9 +182,8 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
             </div>
           ) : (
             chats.map(chat => (
-              <div key={chat._id} className={`relative group flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                currentChatId === chat._id ? 'bg-white/20' : 'hover:bg-white/10'
-              }`}>
+              <div key={chat._id} className={`relative group flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${currentChatId === chat._id ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'hover:bg-white/5 text-gray-400 hover:text-white'
+                }`}>
                 {editingId === chat._id ? (
                   <input
                     autoFocus
@@ -262,7 +260,7 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
           )}
         </div>
 
-        <div className="p-3 sm:p-4 border-t border-gray-700">
+        <div className="p-3 sm:p-4 border-t border-white/10">
           {!user || user.id === 'guest' ? (
             <div className="space-y-2">
               <a href="/login" className="w-full block text-center px-3 sm:px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors text-white text-sm">
@@ -275,7 +273,7 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
           ) : (
             <button
               onClick={onOpenSettings}
-              className="w-full flex items-center gap-3 px-3 py-2 hover:bg-white/10 rounded-lg transition-colors text-white"
+              className="w-full flex items-center gap-3 px-3 py-2 hover:bg-white/5 hover:text-emerald-400 rounded-lg transition-colors text-white"
             >
               {user.avatar ? (
                 <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-full object-cover" referrerPolicy="no-referrer" />

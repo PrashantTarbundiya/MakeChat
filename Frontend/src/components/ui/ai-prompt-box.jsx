@@ -51,7 +51,7 @@ const TooltipContent = React.forwardRef(({ className, sideOffset = 4, ...props }
     ref={ref}
     sideOffset={sideOffset}
     className={cn(
-      "z-50 overflow-hidden rounded-md border border-[#333333] bg-[#1F2023] px-3 py-1.5 text-sm text-white shadow-md animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+      "z-50 overflow-hidden rounded-md border border-white/10 bg-[#0A0A0A] px-3 py-1.5 text-sm text-white shadow-md animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
       className
     )}
     {...props}
@@ -79,7 +79,7 @@ const DialogContent = React.forwardRef(({ className, children, ...props }, ref) 
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-[90vw] md:max-w-[800px] translate-x-[-50%] translate-y-[-50%] gap-4 border border-[#333333] bg-[#1F2023] p-0 shadow-xl duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 rounded-2xl",
+        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-[90vw] md:max-w-[800px] translate-x-[-50%] translate-y-[-50%] gap-4 border border-white/10 bg-[#0A0A0A] p-0 shadow-xl duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 rounded-2xl",
         className
       )}
       {...props}
@@ -248,6 +248,20 @@ const ImageViewDialog = ({ imageUrl, onClose }) => {
             alt="Full preview"
             className="w-full max-h-[80vh] object-contain rounded-2xl"
           />
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              const a = document.createElement('a');
+              a.href = imageUrl;
+              a.download = 'image.png';
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+            }}
+            className="absolute bottom-4 right-4 p-2 bg-black/60 hover:bg-black/80 rounded-full text-white backdrop-blur-sm transition-colors"
+          >
+            <ArrowUp className="h-5 w-5 rotate-180" />
+          </button>
         </motion.div>
       </DialogContent>
     </Dialog>
@@ -257,7 +271,7 @@ const ImageViewDialog = ({ imageUrl, onClose }) => {
 const PromptInputContext = React.createContext({
   isLoading: false,
   value: "",
-  setValue: () => {},
+  setValue: () => { },
   maxHeight: 240,
   onSubmit: undefined,
   disabled: false,
@@ -306,7 +320,7 @@ const PromptInput = React.forwardRef(
           <div
             ref={ref}
             className={cn(
-              "rounded-3xl border border-[#444444] bg-[#1F2023] p-2 shadow-[0_8px_30px_rgba(0,0,0,0.24)] transition-all duration-300",
+              "rounded-3xl border border-white/10 bg-[#0A0A0A] p-2 shadow-[0_8px_30px_rgba(0,0,0,0.24)] transition-all duration-300",
               isLoading && "border-red-500/70",
               className
             )}
@@ -337,8 +351,10 @@ const PromptInputTextarea = ({ className, onKeyDown, disableAutosize = false, pl
   }, [value, maxHeight, disableAutosize]);
 
   const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey && window.innerWidth > 768) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      // Prevent default to avoid new line
       e.preventDefault();
+      // Only submit if not empty or has files (handled in onSubmit)
       onSubmit?.();
     }
     onKeyDown?.(e);
@@ -390,7 +406,7 @@ const CustomDivider = () => (
 );
 
 export const PromptInputBox = React.forwardRef((props, ref) => {
-  const { onSend = () => {}, isLoading = false, placeholder = "Type your message here...", className, defaultModel = 'llama-maverick', onStop = () => {}, selectedModel: externalModel } = props;
+  const { onSend = () => { }, isLoading = false, placeholder = "Type your message here...", className, defaultModel = 'llama-maverick', onStop = () => { }, selectedModel: externalModel } = props;
   const [input, setInput] = React.useState("");
   const [files, setFiles] = React.useState([]);
   const [filePreviews, setFilePreviews] = React.useState({});
@@ -541,7 +557,7 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
     }
   };
 
-  const handleStartRecording = () => {};
+  const handleStartRecording = () => { };
 
   const handleStopRecording = (transcribedText) => {
     setIsRecording(false);
@@ -560,7 +576,7 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
         isLoading={isLoading}
         onSubmit={handleSubmit}
         className={cn(
-          "w-full bg-[#1F2023] border-[#444444] shadow-[0_8px_30px_rgba(0,0,0,0.24)] transition-all duration-300 ease-in-out",
+          "w-full bg-[#0A0A0A] border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.24)] transition-all duration-300 ease-in-out focus-within:border-emerald-500/50 focus-within:shadow-[0_0_20px_rgba(16,185,129,0.1)]",
           isRecording && "border-red-500/70",
           className
         )}
@@ -622,18 +638,18 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
               showSearch
                 ? "Search the web..."
                 : showThink
-                ? "Think deeply..."
-                : showCanvas
-                ? "Create on canvas..."
-                : selectedModel === 'bytez-image'
-                ? "Describe the image you want to generate..."
-                : selectedModel === 'bytez-video'
-                ? "Describe the video you want to create..."
-                : selectedModel === 'bytez-audio'
-                ? "Describe the audio you want to generate..."
-                : selectedModel === 'bytez-music'
-                ? "Describe the music you want to create..."
-                : placeholder
+                  ? "Think deeply..."
+                  : showCanvas
+                    ? "Create on canvas..."
+                    : selectedModel === 'bytez-image'
+                      ? "Describe the image you want to generate..."
+                      : selectedModel === 'bytez-video'
+                        ? "Describe the video you want to create..."
+                        : selectedModel === 'bytez-audio'
+                          ? "Describe the audio you want to generate..."
+                          : selectedModel === 'bytez-music'
+                            ? "Describe the music you want to create..."
+                            : placeholder
             }
             className="text-base"
           />
@@ -676,11 +692,10 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
                         setSelectedModel(model.id);
                         setShowModelDropdown(false);
                       }}
-                      className={`w-full px-4 py-2 text-left text-sm transition-colors ${
-                        selectedModel === model.id
-                          ? 'bg-white/10 text-white'
-                          : 'text-[#9CA3AF] hover:bg-gray-600/30 hover:text-white'
-                      }`}
+                      className={`w-full px-4 py-2 text-left text-sm transition-colors ${selectedModel === model.id
+                        ? 'bg-white/10 text-white'
+                        : 'text-[#9CA3AF] hover:bg-gray-600/30 hover:text-white'
+                        }`}
                     >
                       {model.name}
                     </button>
@@ -830,10 +845,10 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
               isLoading
                 ? "Stop generation"
                 : isRecording
-                ? "Stop recording"
-                : hasContent
-                ? "Send message"
-                : "Voice message"
+                  ? "Stop recording"
+                  : hasContent
+                    ? "Send message"
+                    : "Voice message"
             }
           >
             <Button
@@ -844,8 +859,8 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
                 isRecording
                   ? "bg-transparent hover:bg-gray-600/30 text-red-500 hover:text-red-400"
                   : hasContent
-                  ? "bg-white hover:bg-white/80 text-[#1F2023]"
-                  : "bg-transparent hover:bg-gray-600/30 text-[#9CA3AF] hover:text-[#D1D5DB]"
+                    ? "bg-white hover:bg-white/80 text-[#1F2023]"
+                    : "bg-transparent hover:bg-gray-600/30 text-[#9CA3AF] hover:text-[#D1D5DB]"
               )}
               onClick={() => {
                 if (isLoading) onStop();

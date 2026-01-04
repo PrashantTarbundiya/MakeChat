@@ -8,7 +8,10 @@ import { SearchView } from "@/components/SearchView";
 import { Sidebar } from "@/components/Sidebar";
 import { Settings } from "@/components/Settings";
 import { Header } from "@/components/Header";
+import { Spotlight } from "@/components/landing/Spotlight";
 import { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+
 import toast, { Toaster } from 'react-hot-toast';
 
 function App({ user, isShared = false }) {
@@ -62,18 +65,18 @@ function App({ user, isShared = false }) {
     setSelectedModel(model);
     setIsLoading(true);
     setCurrentResponse('');
-    
+
     // Auto-detect mode from message content
     let isSearch = message.startsWith('[Search:');
     let isThink = message.startsWith('[Think:');
     const isCanvas = message.startsWith('[Canvas:');
-    
+
     // AI auto-detection
     if (!isSearch && !isThink && !isCanvas) {
       const lowerMsg = message.toLowerCase();
       const searchKeywords = ['latest', 'current', 'news', 'today', 'recent', 'what is happening', 'update on', 'search for', 'find information'];
       const thinkKeywords = ['analyze', 'compare', 'explain deeply', 'think about', 'reasoning', 'why', 'how does', 'complex'];
-      
+
       if (searchKeywords.some(kw => lowerMsg.includes(kw))) {
         isSearch = true;
         message = `[Search: ${message}]`;
@@ -82,43 +85,43 @@ function App({ user, isShared = false }) {
         message = `[Think: ${message}]`;
       }
     }
-    
+
     // Set loading state
     if (isSearch) setLoadingState('🌐 Searching web...');
     else if (isThink) setLoadingState('🧠 Thinking deeply...');
     else setLoadingState('✨ Generating response...');
-    
+
     // Remove mode prefix from display
     let cleanMessage = message;
     if (isSearch) cleanMessage = message.replace(/^\[Search:\s*/, '').replace(/\]$/, '');
     if (isThink) cleanMessage = message.replace(/^\[Think:\s*/, '').replace(/\]$/, '');
     if (isCanvas) cleanMessage = message.replace(/^\[Canvas:\s*/, '').replace(/\]$/, '');
-    
+
     // Upload files to Cloudinary first if present (silently in background)
     let uploadedFileUrl = null;
     let uploadedFilePublicId = null;
     let uploadedFileInfo = '';
     let uploadRetries = 3;
-    
+
     if (files && files.length > 0) {
       const file = files[0];
-      
+
       // Upload to Cloudinary with retries (no UI feedback)
       while (uploadRetries > 0 && !uploadedFileUrl) {
         try {
           const formData = new FormData();
           formData.append('file', file);
-          
+
           const uploadResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/upload/file`, {
             method: 'POST',
             body: formData
           });
-          
+
           if (uploadResponse.ok) {
             const uploadData = await uploadResponse.json();
             uploadedFileUrl = uploadData.url;
             uploadedFilePublicId = uploadData.publicId;
-            
+
             // Add file info to message (image first, then text)
             if (file.type.startsWith('image/')) {
               uploadedFileInfo = `![Uploaded Image](${uploadedFileUrl})\n\n`;
@@ -135,7 +138,7 @@ function App({ user, isShared = false }) {
           }
         }
       }
-      
+
       // If upload failed after retries, don't send message
       if (!uploadedFileUrl) {
         setIsLoading(false);
@@ -143,7 +146,7 @@ function App({ user, isShared = false }) {
         return;
       }
     }
-    
+
     setMessages(prev => [...prev, { role: 'user', content: cleanMessage + uploadedFileInfo, mode: isSearch ? 'search' : isThink ? 'think' : isCanvas ? 'canvas' : 'normal', filePublicId: uploadedFilePublicId }]);
 
     setTimeout(() => {
@@ -198,33 +201,33 @@ function App({ user, isShared = false }) {
                 fullResponse += parsed.content;
               }
               setCurrentResponse(fullResponse);
-            } catch (e) {}
+            } catch (e) { }
           }
         }
       }
 
       let cleanResponse = fullResponse.replace(/<\d+\/\d+>/g, '').trim();
       let extractedThinking = thinkingText;
-      
+
       const thinkMatch = cleanResponse.match(/<think>([\s\S]*?)<\/think>/);
       if (thinkMatch) {
         extractedThinking = thinkMatch[1].trim();
         cleanResponse = cleanResponse.replace(/<think>[\s\S]*?<\/think>/, '').trim();
       }
-      
+
       // Store thinking if present
       const hasThinking = extractedThinking && extractedThinking.trim().length > 0;
-      
+
       setMessages(prev => {
         const lastMsg = prev[prev.length - 1];
         const versions = lastMsg?.versions || [];
         versions.push(cleanResponse);
-        
-        return [...prev, { 
-          role: 'assistant', 
-          content: cleanResponse, 
-          model, 
-          mode: isSearch ? 'search' : isThink ? 'think' : isCanvas ? 'canvas' : 'normal', 
+
+        return [...prev, {
+          role: 'assistant',
+          content: cleanResponse,
+          model,
+          mode: isSearch ? 'search' : isThink ? 'think' : isCanvas ? 'canvas' : 'normal',
           thinking: hasThinking ? extractedThinking : undefined,
           versions,
           currentVersion: versions.length - 1
@@ -258,13 +261,13 @@ function App({ user, isShared = false }) {
     if (messages.length >= 2) {
       const lastUserMsg = messages[messages.length - 2];
       const lastAssistantMsg = messages[messages.length - 1];
-      
+
       // Store current response as a version
       const versions = lastAssistantMsg.versions || [lastAssistantMsg.content];
-      
+
       // Remove last assistant message and regenerate without adding user message again
       setMessages(prev => prev.slice(0, -1));
-      
+
       // Call the API directly without adding user message
       setIsLoading(true);
       setCurrentResponse('');
@@ -311,30 +314,30 @@ function App({ user, isShared = false }) {
                   fullResponse += parsed.content;
                 }
                 setCurrentResponse(fullResponse);
-              } catch (e) {}
+              } catch (e) { }
             }
           }
         }
 
         let cleanResponse = fullResponse.replace(/<\d+\/\d+>/g, '').trim();
         let extractedThinking = thinkingText;
-        
+
         const thinkMatch = cleanResponse.match(/<think>([\s\S]*?)<\/think>/);
         if (thinkMatch) {
           extractedThinking = thinkMatch[1].trim();
           cleanResponse = cleanResponse.replace(/<think>[\s\S]*?<\/think>/, '').trim();
         }
-        
+
         const hasThinking = extractedThinking && extractedThinking.trim().length > 0;
-        
+
         // Add new version
         const newVersions = [...versions, cleanResponse];
-        
-        setMessages(prev => [...prev, { 
-          role: 'assistant', 
-          content: cleanResponse, 
-          model: lastAssistantMsg.model || selectedModel, 
-          mode: lastAssistantMsg.mode || 'normal', 
+
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: cleanResponse,
+          model: lastAssistantMsg.model || selectedModel,
+          mode: lastAssistantMsg.mode || 'normal',
           thinking: hasThinking ? extractedThinking : undefined,
           versions: newVersions,
           currentVersion: newVersions.length - 1
@@ -460,7 +463,7 @@ function App({ user, isShared = false }) {
 
   const saveChat = async () => {
     if (user?.id === 'guest' || messages.length === 0) return;
-    
+
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
@@ -542,7 +545,8 @@ function App({ user, isShared = false }) {
   }, [messages, currentChatId, user, isShared]);
 
   return (
-    <div className="flex w-full h-screen bg-black overflow-hidden">
+    <div className="flex w-full h-screen bg-black overflow-hidden relative">
+      <Spotlight />
       <Toaster position="top-center" toastOptions={{ style: { background: '#1F2023', color: '#fff' } }} />
       <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       <Sidebar
@@ -557,171 +561,194 @@ function App({ user, isShared = false }) {
         onOpenSettings={() => setSettingsOpen(true)}
       />
       <div className={`flex flex-col flex-1 transition-all duration-300 ${sidebarOpen ? 'lg:ml-64' : 'ml-0'} ${thinkingPanel !== null ? 'lg:mr-[300px]' : ''} h-screen`}>
-      <div className="flex-1 overflow-y-auto p-2 sm:p-4 pt-[70px] md:pt-[80px] pb-[120px] md:pb-[140px] scrollbar-thin scrollbar-thumb-black scrollbar-track-black">
-        <div className="max-w-[900px] mx-auto space-y-4">
-          {messages.length === 0 && !isLoading && (
-            <div className="flex items-center justify-center min-h-[60vh]">
-              <div className="text-center px-4">
-                <h1 className="text-2xl sm:text-3xl font-bold text-white mb-3">
-                  {user?.name ? [
-                    `Hello, ${user.name}! 👋`,
-                    `Welcome back, ${user.name}! ✨`,
-                    `Hi ${user.name}! Ready to chat? 💬`,
-                    `Hey ${user.name}! What can I help you with? 🚀`,
-                    `Good to see you, ${user.name}! 😊`
-                  ][Math.floor(Math.random() * 5)] : [
-                    `Hello! How can I assist you today? 🤖`,
-                    `Welcome! Let's create something amazing! 🎨`,
-                    `Hi there! What's on your mind? 💭`,
-                    `Ready to explore? Let's get started! 🌟`,
-                    `Hello! I'm here to help! 💡`
-                  ][Math.floor(Math.random() * 5)]}
-                </h1>
-                <p className="text-gray-400 text-sm sm:text-base">Start a conversation or ask me anything</p>
-              </div>
-            </div>
-          )}
-          {messages.map((msg, i) => {
-            const isLastAssistant = msg.role === 'assistant' && i === messages.length - 1;
-            const isLastUser = msg.role === 'user' && i === messages.length - 1;
-            
-            return (
-              <div key={i} className="group" ref={isLastUser ? lastUserMessageRef : null}>
-                <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`space-y-2 ${msg.role === 'user' ? 'max-w-[80%]' : msg.mode === 'canvas' ? 'w-full' : 'max-w-[95%]'}`}>
-                    {editingIndex === i ? (
-                      <EditMessage
-                        value={editText}
-                        onChange={setEditText}
-                        onSave={() => handleSaveEdit(i)}
-                        onCancel={() => setEditingIndex(null)}
-                        role={msg.role}
-                        onRemoveFile={async () => {
-                          if (msg.filePublicId) {
-                            try {
-                              await fetch(`${import.meta.env.VITE_API_URL}/api/upload/delete`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ publicId: msg.filePublicId })
-                              });
-                            } catch (e) {
-                              console.error('Failed to delete file:', e);
-                            }
-                          }
-                        }}
-                      />
-                    ) : msg.role === 'assistant' && msg.mode === 'canvas' ? (
-                      <CanvasView content={msg.content} />
-                    ) : msg.role === 'assistant' && msg.mode === 'think' ? (
-                      <ThinkingView content={msg.content} />
-                    ) : msg.role === 'assistant' && msg.mode === 'search' ? (
-                      <SearchView content={msg.content} />
-                    ) : (
-                      <MessageBubble 
-                        content={msg.content} 
-                        role={msg.role} 
-                        versions={msg.versions}
-                        currentVersion={msg.currentVersion || 0}
-                        onVersionChange={(v) => handleVersionChange(i, v)}
-                      />
-                    )}
-                    {msg.thinking && msg.role === 'assistant' && editingIndex !== i && (
-                      <button
-                        onClick={() => setThinkingPanel(thinkingPanel === i ? null : i)}
-                        className="mt-2 px-3 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-sm text-white"
-                      >
-                        💭 Thinking
-                      </button>
-                    )}
-                  </div>
+        <div className="flex-1 overflow-y-auto p-2 sm:p-4 pt-[70px] md:pt-[80px] pb-[120px] md:pb-[140px] scrollbar-thin scrollbar-thumb-black scrollbar-track-black">
+          <div className="max-w-[900px] mx-auto space-y-4">
+            {messages.length === 0 && !isLoading && (
+              <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                  className="text-center mb-8"
+                >
+                  <h1 className="text-3xl sm:text-4xl font-bold text-white mb-3">
+                    {user?.name ? `Welcome back, ${user.name}` : 'Welcome to MakeChat'}
+                  </h1>
+                  <p className="text-gray-400 text-lg">How can I help you today?</p>
+                </motion.div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-[600px]">
+                  {[
+                    { icon: '💻', title: 'Write code', desc: 'Create a Python script for data analysis' },
+                    { icon: '🎨', title: 'Design UI', desc: 'Generate a modern landing page design' },
+                    { icon: '🧠', title: 'Brainstorm', desc: 'Ideas for a new marketing campaign' },
+                    { icon: '📝', title: 'Summarize', desc: 'Condense a long article or document' }
+                  ].map((item, i) => (
+                    <motion.button
+                      key={i}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: i * 0.1, duration: 0.3 }}
+                      onClick={() => handleSendMessage(item.desc, [], selectedModel)}
+                      className="flex items-center gap-3 p-4 bg-[#1F2023] hover:bg-[#2A2B2E] border border-white/5 hover:border-emerald-500/30 rounded-xl transition-all text-left group"
+                    >
+                      <span className="text-2xl group-hover:scale-110 transition-transform">{item.icon}</span>
+                      <div>
+                        <div className="text-white font-medium text-sm">{item.title}</div>
+                        <div className="text-gray-400 text-xs">{item.desc}</div>
+                      </div>
+                    </motion.button>
+                  ))}
                 </div>
-                {!editingIndex && (
-                  <MessageActions
-                    role={msg.role}
-                    isLast={isLastAssistant}
-                    isLoading={isLoading}
-                    onRegenerate={handleRegenerate}
-                    onEdit={() => handleEdit(i)}
-                    onCopy={() => handleCopy(msg.content, i)}
-                    isCopied={copiedIndex === i}
-                    versions={msg.versions}
-                    currentVersion={msg.currentVersion || 0}
-                    onVersionChange={(v) => handleVersionChange(i, v)}
-                  />
-                )}
               </div>
-            );
-          })}
-          {isLoading && !currentResponse && loadingState && (
-            <div className="flex justify-start">
-              <div className="bg-white/5 rounded-2xl px-4 py-3 text-white/70 text-sm">
-                <style>{`@keyframes dots{0%,20%{content:''}40%{content:'.'}60%{content:'..'}80%,100%{content:'...'}}`}</style>
-                <span>{loadingState.replace('...', '')}<span className="inline-block" style={{animation:'dots 1.5s infinite'}}></span></span>
+            )}
+            {messages.map((msg, i) => {
+              const isLastAssistant = msg.role === 'assistant' && i === messages.length - 1;
+              const isLastUser = msg.role === 'user' && i === messages.length - 1;
+
+              return (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="group"
+                  ref={isLastUser ? lastUserMessageRef : null}
+                >
+                  <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`space-y-2 ${msg.role === 'user' ? 'max-w-[80%]' : msg.mode === 'canvas' ? 'w-full' : 'max-w-[95%]'}`}>
+                      {editingIndex === i ? (
+                        <EditMessage
+                          value={editText}
+                          onChange={setEditText}
+                          onSave={() => handleSaveEdit(i)}
+                          onCancel={() => setEditingIndex(null)}
+                          role={msg.role}
+                          onRemoveFile={async () => {
+                            if (msg.filePublicId) {
+                              try {
+                                await fetch(`${import.meta.env.VITE_API_URL}/api/upload/delete`, {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ publicId: msg.filePublicId })
+                                });
+                              } catch (e) {
+                                console.error('Failed to delete file:', e);
+                              }
+                            }
+                          }}
+                        />
+                      ) : msg.role === 'assistant' && msg.mode === 'canvas' ? (
+                        <CanvasView content={msg.content} />
+                      ) : msg.role === 'assistant' && msg.mode === 'think' ? (
+                        <ThinkingView content={msg.content} />
+                      ) : msg.role === 'assistant' && msg.mode === 'search' ? (
+                        <SearchView content={msg.content} />
+                      ) : (
+                        <MessageBubble
+                          content={msg.content}
+                          role={msg.role}
+                          versions={msg.versions}
+                          currentVersion={msg.currentVersion || 0}
+                          onVersionChange={(v) => handleVersionChange(i, v)}
+                        />
+                      )}
+                      {msg.thinking && msg.role === 'assistant' && editingIndex !== i && (
+                        <button
+                          onClick={() => setThinkingPanel(thinkingPanel === i ? null : i)}
+                          className="mt-2 px-3 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-sm text-white"
+                        >
+                          💭 Thinking
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {!editingIndex && (
+                    <MessageActions
+                      role={msg.role}
+                      isLast={isLastAssistant}
+                      isLoading={isLoading}
+                      onRegenerate={handleRegenerate}
+                      onEdit={() => handleEdit(i)}
+                      onCopy={() => handleCopy(msg.content, i)}
+                      isCopied={copiedIndex === i}
+                      versions={msg.versions}
+                      currentVersion={msg.currentVersion || 0}
+                      onVersionChange={(v) => handleVersionChange(i, v)}
+                    />
+                  )}
+                </motion.div>
+              );
+            })}
+            {isLoading && !currentResponse && loadingState && (
+              <div className="flex justify-start">
+                <div className="bg-white/5 rounded-2xl px-4 py-3 text-white/70 text-sm">
+                  <style>{`@keyframes dots{0%,20%{content:''}40%{content:'.'}60%{content:'..'}80%,100%{content:'...'}}`}</style>
+                  <span>{loadingState.replace('...', '')}<span className="inline-block" style={{ animation: 'dots 1.5s infinite' }}></span></span>
+                </div>
               </div>
-            </div>
-          )}
-          {currentResponse && !currentResponse.includes('media-container') && (
-            <div className="flex justify-start">
-              <div className="max-w-[95%]">
-                {messages[messages.length - 1]?.mode === 'canvas' ? (
-                  <MessageBubble content={currentResponse} role="assistant" />
-                ) : messages[messages.length - 1]?.mode === 'think' ? (
-                  <ThinkingView content={currentResponse} />
-                ) : messages[messages.length - 1]?.mode === 'search' ? (
-                  <SearchView content={currentResponse} />
-                ) : (
-                  <MessageBubble content={currentResponse} role="assistant" />
-                )}
+            )}
+            {currentResponse && !currentResponse.includes('media-container') && (
+              <div className="flex justify-start">
+                <div className="max-w-[95%]">
+                  {messages[messages.length - 1]?.mode === 'canvas' ? (
+                    <MessageBubble content={currentResponse} role="assistant" />
+                  ) : messages[messages.length - 1]?.mode === 'think' ? (
+                    <ThinkingView content={currentResponse} />
+                  ) : messages[messages.length - 1]?.mode === 'search' ? (
+                    <SearchView content={currentResponse} />
+                  ) : (
+                    <MessageBubble content={currentResponse} role="assistant" />
+                  )}
+                </div>
               </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
+            )}
+            <div ref={messagesEndRef} />
+          </div>
         </div>
-      </div>
-      <div className={`fixed bottom-0 left-0 right-0 p-2 sm:p-3 bg-gradient-to-t from-black via-black/95 to-transparent backdrop-blur-sm ${sidebarOpen ? 'lg:left-64' : 'left-0'} ${thinkingPanel !== null ? 'lg:right-[300px]' : 'right-0'} z-10 pb-safe`}>
-        <div className={`w-full mx-auto ${thinkingPanel !== null ? 'max-w-[700px]' : 'max-w-[800px]'}`}>
-          <PromptInputBox 
-            onSend={handleSendMessage} 
-            isLoading={isLoading} 
-            defaultModel={selectedModel}
-            selectedModel={selectedModel}
-            onStop={handleStop}
-          />
+        <div className={`fixed bottom-0 left-0 right-0 p-2 sm:p-3 bg-gradient-to-t from-black via-black/95 to-transparent backdrop-blur-sm ${sidebarOpen ? 'lg:left-64' : 'left-0'} ${thinkingPanel !== null ? 'lg:right-[300px]' : 'right-0'} z-10 pb-safe`}>
+          <div className={`w-full mx-auto ${thinkingPanel !== null ? 'max-w-[700px]' : 'max-w-[800px]'}`}>
+            <PromptInputBox
+              onSend={handleSendMessage}
+              isLoading={isLoading}
+              defaultModel={selectedModel}
+              selectedModel={selectedModel}
+              onStop={handleStop}
+            />
+          </div>
         </div>
-      </div>
       </div>
       {thinkingPanel !== null && messages[thinkingPanel]?.thinking && (
         <>
-        <div className="fixed right-0 top-0 h-full w-full sm:w-[300px] bg-[#1F2023] border-l border-gray-700 shadow-2xl z-50 flex flex-col">
-          <div className="flex items-center justify-between p-4 border-b border-gray-700">
-            <h3 className="text-white font-semibold flex items-center gap-2">
-              <span>💭</span> Thinking Process
-            </h3>
-            <button
-              onClick={() => setThinkingPanel(null)}
-              className="text-white hover:bg-white/10 rounded p-1"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M18 6L6 18M6 6l12 12"/>
-              </svg>
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="text-white whitespace-pre-wrap text-sm leading-relaxed">
-              {messages[thinkingPanel].thinking}
+          <div className="fixed right-0 top-0 h-full w-full sm:w-[300px] bg-[#1F2023] border-l border-gray-700 shadow-2xl z-50 flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-gray-700">
+              <h3 className="text-white font-semibold flex items-center gap-2">
+                <span>💭</span> Thinking Process
+              </h3>
+              <button
+                onClick={() => setThinkingPanel(null)}
+                className="text-white hover:bg-white/10 rounded p-1"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="text-white whitespace-pre-wrap text-sm leading-relaxed">
+                {messages[thinkingPanel].thinking}
+              </div>
             </div>
           </div>
-        </div>
-        {window.innerWidth < 640 && (
-          <div
-            onClick={() => setThinkingPanel(null)}
-            className="fixed inset-0 bg-black/50 z-40"
-          />
-        )}
+          {window.innerWidth < 640 && (
+            <div
+              onClick={() => setThinkingPanel(null)}
+              className="fixed inset-0 bg-black/50 z-40"
+            />
+          )}
         </>
       )}
       <Settings user={user} isOpen={settingsOpen} setIsOpen={setSettingsOpen} onLogout={handleLogout} />
-      
+
 
     </div>
   );
