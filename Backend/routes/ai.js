@@ -478,17 +478,25 @@ router.post('/chat', upload.array('files'), async (req, res) => {
         role: m.role,
         content: m.content
       }));
+      
       const { error, output } = await bytezModel.run(bytezMessages);
       if (error) throw new Error(error);
       
+      // Extract content from response
+      let responseText = '';
       if (typeof output === 'object' && output.content) {
-        fullResponse = output.content;
+        if (Array.isArray(output.content)) {
+          responseText = output.content.map(c => c.text || c).join('');
+        } else {
+          responseText = output.content;
+        }
       } else if (typeof output === 'string') {
-        fullResponse = output;
+        responseText = output;
       } else {
-        fullResponse = JSON.stringify(output);
+        responseText = JSON.stringify(output);
       }
       
+      fullResponse = responseText;
       res.write(`data: ${JSON.stringify({ content: fullResponse })}
 
 `);
