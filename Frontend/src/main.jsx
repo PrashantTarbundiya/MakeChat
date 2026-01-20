@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import './index.css'
 import App from './App.jsx'
+import GoogleAnalytics from './components/GoogleAnalytics.jsx'
 import LandingPage from './pages/LandingPage.jsx'
 import { Login } from './pages/Login.jsx'
 import { Signup } from './pages/Signup.jsx'
@@ -28,6 +29,7 @@ const Root = () => {
   return (
     <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
       <BrowserRouter>
+        <GoogleAnalytics />
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={!user ? <Login onLogin={setUser} /> : <Navigate to="/chat" />} />
