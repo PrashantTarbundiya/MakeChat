@@ -32,7 +32,7 @@ const MODELS = {
   'qwen-32b': 'qwen/qwen3-32b',
   'claude-opus': 'anthropic/claude-opus-4-5',
   'llm-council': 'council',
-  'bytez-image': 'stabilityai/stable-diffusion-xl-base-1.0',
+  'bytez-image': 'google/gemini-3-pro-image-preview',
   'bytez-video': 'ali-vilab/text-to-video-ms-1.7b',
   'bytez-audio': 'suno/bark-small',
   'bytez-music': 'facebook/musicgen-stereo-small'
