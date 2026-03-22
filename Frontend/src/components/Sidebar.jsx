@@ -71,6 +71,17 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
       const token = localStorage.getItem('token');
       if (!token) return;
 
+      // Close the confirmation modal immediately
+      setDeleteConfirm(null);
+      setMenuOpen(null);
+
+      // Remove from local state immediately for instant UI feedback
+      setChats(prev => prev.filter(c => c._id !== chatId));
+      const updatedChats = chats.filter(c => c._id !== chatId).slice(0, 4);
+      localStorage.setItem('cachedChats', JSON.stringify(updatedChats));
+
+      if (currentChatId === chatId) onNewChat();
+
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/chat/${chatId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
@@ -85,15 +96,11 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
       }
 
       if (response.ok) {
-        fetchChats();
-        if (currentChatId === chatId) onNewChat();
-        setDeleteConfirm(null);
-        // Update cache
-        const updatedChats = chats.filter(c => c._id !== chatId).slice(0, 4);
-        localStorage.setItem('cachedChats', JSON.stringify(updatedChats));
+        fetchChats(); // Refetch to ensure sync with server
       }
     } catch (error) {
       console.error('Failed to delete chat:', error);
+      fetchChats(); // Refetch on error to restore state
     }
   };
 
