@@ -444,6 +444,7 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
     { id: 'deepseek', name: 'DeepSeek V3.2' },
     { id: 'qwen-32b', name: 'Qwen 32B' },
     { id: 'claude-opus', name: 'Claude Opus 4.5' },
+    { id: 'step-3.5-flash', name: 'Step 3.5 Flash' },
     { id: 'llm-council', name: '🏛️ LLM Council' },
     { id: 'bytez-image', name: 'Image Gen' },
     { id: 'bytez-video', name: 'Video Gen' },

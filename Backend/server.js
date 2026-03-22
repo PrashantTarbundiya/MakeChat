@@ -9,6 +9,7 @@ import authRoutes from './routes/auth.js';
 import chatRoutes from './routes/chat.js';
 import memoryRoutes from './routes/memory.js';
 import uploadRoutes from './routes/upload.js';
+import usageRoutes from './routes/usage.js';
 
 connectDB();
 
@@ -29,6 +30,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/memory', memoryRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/usage', usageRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'AI Backend Server Running' });

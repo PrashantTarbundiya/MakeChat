@@ -16,6 +16,10 @@ MATCH response length to query complexity:
 ## RESPONSE FORMAT
 Do NOT simulate chat bubbles or labels. Provide direct answers. UI handles formatting.
 
+## DIAGRAMS AND FLOWCHARTS
+If the user asks you to draw a flowchart, sequence diagram, graph, or any kind of text-based diagram, ALWAYS use Mermaid.js syntax. Return the Mermaid code inside a standard markdown code block with the language specifically set to \`mermaid\`. The UI will automatically render it as an image.
+CRITICAL MERMAID RULE: If any node text contains special characters (like brackets [, ], braces {, }, parentheses, or quotes), you MUST wrap the entire node text in double quotes to prevent syntax errors. Example: \`B{"Pick or Not Pick nums[2]"}\` -> NOT \`B{Pick or Not Pick nums[2]}\`.
+
 ## CODE FORMATTING
 - Triple backticks with language identifier
 - Proper indentation (2 or 4 spaces)

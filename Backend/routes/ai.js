@@ -23,12 +23,13 @@ const bytez = new Bytez(process.env.BYTEZ_API);
 
 const MODELS = {
   'gpt-oss': 'openai/gpt-oss-120b',
-  'llama-maverick': 'meta-llama/llama-4-maverick-17b-128e-instruct',
+  'llama-maverick': 'meta-llama/llama-4-scout-17b-16e-instruct',
   'llama-scout': 'meta-llama/llama-4-scout-17b-16e-instruct',
   'kimi': 'moonshotai/kimi-k2-instruct-0905',
   'gemini-pro': 'gemini-pro',
   'grok-fast': 'x-ai/grok-4.1-fast:free',
   'deepseek': 'deepseek/deepseek-v3.2',
+  'step-3.5-flash': 'stepfun/step-3.5-flash:free',
   'qwen-32b': 'qwen/qwen3-32b',
   'claude-opus': 'anthropic/claude-opus-4-5',
   'llm-council': 'council',
@@ -386,7 +387,7 @@ router.post('/chat', upload.array('files'), async (req, res) => {
       }
     }
     // Handle OpenRouter text models
-    else if (['grok-fast', 'deepseek'].includes(model)) {
+    else if (['grok-fast', 'deepseek', 'step-3.5-flash'].includes(model)) {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -417,6 +418,13 @@ router.post('/chat', upload.array('files'), async (req, res) => {
           try {
             const parsed = JSON.parse(data);
             const content = parsed.choices[0]?.delta?.content;
+            const reasoning = parsed.choices[0]?.delta?.reasoning;
+            
+            if (reasoning) {
+              res.write(`data: ${JSON.stringify({ reasoning })}
+
+`);
+            }
             if (content) {
               fullResponse += content;
               res.write(`data: ${JSON.stringify({ content })}
@@ -600,6 +608,16 @@ router.post('/chat', upload.array('files'), async (req, res) => {
         }
       } catch (e) {
         console.error('Failed to auto-save memory:', e);
+      }
+    }
+
+    // Track usage stats
+    if (userId && userId !== 'guest' && fullResponse) {
+      try {
+        const UsageStats = (await import('../models/UsageStats.js')).default;
+        await UsageStats.trackUsage(userId, model);
+      } catch (e) {
+        console.error('Failed to track usage:', e);
       }
     }
 

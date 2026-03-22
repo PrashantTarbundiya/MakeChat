@@ -8,6 +8,7 @@ import { SearchView } from "@/components/SearchView";
 import { Sidebar } from "@/components/Sidebar";
 import { Settings } from "@/components/Settings";
 import { Header } from "@/components/Header";
+import { QueryOutline } from "@/components/QueryOutline";
 import { Spotlight } from "@/components/landing/Spotlight";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -33,6 +34,19 @@ function App({ user, isShared = false }) {
   const messagesEndRef = useRef(null);
   const abortControllerRef = useRef(null);
   const lastUserMessageRef = useRef(null);
+  const messageRefs = useRef({});
+
+  const handleScrollToMessage = (index) => {
+    const el = messageRefs.current[index];
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Flash highlight
+      el.classList.add('ring-1', 'ring-emerald-500/50', 'bg-emerald-500/5', 'rounded-xl');
+      setTimeout(() => {
+        el.classList.remove('ring-1', 'ring-emerald-500/50', 'bg-emerald-500/5', 'rounded-xl');
+      }, 1500);
+    }
+  };
 
   const handleSendMessage = async (message, files, model) => {
     // Check if user is authenticated when trying to send a message
@@ -200,7 +214,7 @@ function App({ user, isShared = false }) {
               } else if (parsed.content) {
                 fullResponse += parsed.content;
               }
-              setCurrentResponse(fullResponse);
+              setCurrentResponse(fullResponse.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/<think>[\s\S]*$/g, ''));
             } catch (e) { }
           }
         }
@@ -209,11 +223,14 @@ function App({ user, isShared = false }) {
       let cleanResponse = fullResponse.replace(/<\d+\/\d+>/g, '').trim();
       let extractedThinking = thinkingText;
 
-      const thinkMatch = cleanResponse.match(/<think>([\s\S]*?)<\/think>/);
-      if (thinkMatch) {
-        extractedThinking = thinkMatch[1].trim();
-        cleanResponse = cleanResponse.replace(/<think>[\s\S]*?<\/think>/, '').trim();
+      // Extract ALL <think> blocks (global, handles multiple)
+      const thinkMatches = [...cleanResponse.matchAll(/<think>([\s\S]*?)<\/think>/g)];
+      if (thinkMatches.length > 0) {
+        extractedThinking = thinkMatches.map(m => m[1].trim()).join('\n\n');
+        cleanResponse = cleanResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
       }
+      // Also strip any unclosed <think> tag at the end (model didn't finish closing it)
+      cleanResponse = cleanResponse.replace(/<think>[\s\S]*$/g, '').trim();
 
       // Store thinking if present
       const hasThinking = extractedThinking && extractedThinking.trim().length > 0;
@@ -234,6 +251,7 @@ function App({ user, isShared = false }) {
         }];
       });
       setCurrentResponse('');
+      setCurrentThinking('');
     } catch (error) {
       if (error.name === 'AbortError') {
         if (currentResponse) {
@@ -271,6 +289,7 @@ function App({ user, isShared = false }) {
       // Call the API directly without adding user message
       setIsLoading(true);
       setCurrentResponse('');
+      setCurrentThinking('');
       abortControllerRef.current = new AbortController();
 
       try {
@@ -307,13 +326,16 @@ function App({ user, isShared = false }) {
               if (data === '[DONE]') break;
               try {
                 const parsed = JSON.parse(data);
-                if (parsed.reasoning) thinkingText += parsed.reasoning;
+                if (parsed.reasoning) {
+                  thinkingText += parsed.reasoning;
+                  setCurrentThinking(thinkingText);
+                }
                 if (isMediaModel && parsed.content?.includes('media-container')) {
                   fullResponse = parsed.content;
                 } else if (parsed.content) {
                   fullResponse += parsed.content;
                 }
-                setCurrentResponse(fullResponse);
+                setCurrentResponse(fullResponse.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/<think>[\s\S]*$/g, ''));
               } catch (e) { }
             }
           }
@@ -322,11 +344,12 @@ function App({ user, isShared = false }) {
         let cleanResponse = fullResponse.replace(/<\d+\/\d+>/g, '').trim();
         let extractedThinking = thinkingText;
 
-        const thinkMatch = cleanResponse.match(/<think>([\s\S]*?)<\/think>/);
-        if (thinkMatch) {
-          extractedThinking = thinkMatch[1].trim();
-          cleanResponse = cleanResponse.replace(/<think>[\s\S]*?<\/think>/, '').trim();
+        const thinkMatches = [...cleanResponse.matchAll(/<think>([\s\S]*?)<\/think>/g)];
+        if (thinkMatches.length > 0) {
+          extractedThinking = thinkMatches.map(m => m[1].trim()).join('\n\n');
+          cleanResponse = cleanResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
         }
+        cleanResponse = cleanResponse.replace(/<think>[\s\S]*$/g, '').trim();
 
         const hasThinking = extractedThinking && extractedThinking.trim().length > 0;
 
@@ -409,6 +432,7 @@ function App({ user, isShared = false }) {
 
     setMessages([]);
     setCurrentResponse('');
+    setCurrentThinking('');
     setCurrentChatId(null);
     setThinkingPanel(null);
   };
@@ -611,8 +635,11 @@ function App({ user, isShared = false }) {
                   key={i}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="group"
-                  ref={isLastUser ? lastUserMessageRef : null}
+                  className="group transition-all duration-500"
+                  ref={(el) => {
+                    messageRefs.current[i] = el;
+                    if (isLastUser) lastUserMessageRef.current = el;
+                  }}
                 >
                   <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     <div className={`space-y-2 ${msg.role === 'user' ? 'max-w-[80%]' : msg.mode === 'canvas' ? 'w-full' : 'max-w-[95%]'}`}>
@@ -747,6 +774,7 @@ function App({ user, isShared = false }) {
           )}
         </>
       )}
+      <QueryOutline messages={messages} onScrollTo={handleScrollToMessage} />
       <Settings user={user} isOpen={settingsOpen} setIsOpen={setSettingsOpen} onLogout={handleLogout} />
 
 
