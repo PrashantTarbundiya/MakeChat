@@ -11,7 +11,7 @@ import { performWebSearch } from '../utils/webSearch.js';
 import { uploadToCloudinary } from '../utils/uploadToCloudinary.js';
 
 const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse').default || require('pdf-parse');
+const pdfParse = require('pdf-parse');
 
 dotenv.config();
 
@@ -55,14 +55,16 @@ router.post('/chat', upload.array('files'), async (req, res) => {
     
     if (files && files.length > 0) {
       const file = files[0];
+      // console.log(`[File Upload] Received: ${file.originalname}, type: ${file.mimetype}, size: ${(file.size / 1024).toFixed(1)}KB`);
       
       // Upload to Cloudinary first
       try {
         const cloudinaryResult = await uploadToCloudinary(file.buffer);
         uploadedFileUrl = cloudinaryResult.secure_url;
         uploadedFilePublicId = cloudinaryResult.public_id;
+        // console.log(`[File Upload] Cloudinary success: ${uploadedFileUrl}`);
       } catch (error) {
-        console.error('Cloudinary upload failed:', error);
+        // console.error('[File Upload] Cloudinary failed:', error.message);
       }
       if (file.mimetype.startsWith('image/')) {
         imageData = {
@@ -72,22 +74,44 @@ router.post('/chat', upload.array('files'), async (req, res) => {
           }
         };
       } else if (file.mimetype === 'application/pdf') {
+        // console.log('[PDF Parse] Starting extraction...');
         try {
           const pdfData = await pdfParse(file.buffer);
-          if (pdfData && pdfData.text && pdfData.text.trim()) {
-            documentText = `\n\n[PDF Document Content]:\n${pdfData.text}`;
+          const text = pdfData?.text?.trim() || '';
+          const pageCount = pdfData?.numpages || 'unknown';
+          // console.log(`[PDF Parse] Success — Pages: ${pageCount}, Characters: ${text.length}`);
+          
+          if (text.length > 0) {
+            // Truncate very large PDFs to avoid token limits
+            const maxChars = 50000;
+            const truncated = text.length > maxChars;
+            const content = truncated ? text.slice(0, maxChars) : text;
+            
+            documentText = `\n\n=== PDF DOCUMENT ===\nFilename: ${file.originalname}\nPages: ${pageCount}\nCharacters: ${text.length}${truncated ? ` (showing first ${maxChars})` : ''}\n\n--- CONTENT START ---\n${content}\n--- CONTENT END ---${truncated ? '\n[Note: Document was truncated due to length. Ask user if they need content from later pages.]' : ''}`;
           } else {
-            documentText = '\n\n[PDF appears to be empty or contains only images. Please describe what you need help with regarding this PDF.]';
+            // console.log('[PDF Parse] No text extracted — PDF may be image-based or scanned');
+            documentText = `\n\n[PDF "${file.originalname}" was uploaded but contains no extractable text. It may be a scanned/image-based PDF. Please describe what you see or need help with regarding this document.]`;
           }
         } catch (e) {
-          console.error('PDF parsing error:', e);
-          documentText = '\n\n[Unable to extract text from PDF. The file may be image-based or protected. Please describe what you need help with.]';
+          // console.error('[PDF Parse] Error:', e.message);
+          documentText = `\n\n[Failed to extract text from "${file.originalname}". Error: ${e.message}. The PDF may be corrupted, encrypted, or image-based. Please describe what you need help with.]`;
         }
       } else if (file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-        const result = await mammoth.extractRawText({ buffer: file.buffer });
-        documentText = `\n\n[Word Document Content]:\n${result.value}`;
+        // console.log('[DOCX Parse] Starting extraction...');
+        try {
+          const result = await mammoth.extractRawText({ buffer: file.buffer });
+          // console.log(`[DOCX Parse] Success — Characters: ${result.value.length}`);
+          documentText = `\n\n=== WORD DOCUMENT ===\nFilename: ${file.originalname}\n\n--- CONTENT START ---\n${result.value}\n--- CONTENT END ---`;
+        } catch (e) {
+          // console.error('[DOCX Parse] Error:', e.message);
+          documentText = `\n\n[Failed to extract text from "${file.originalname}". Please describe what you need help with.]`;
+        }
       } else if (file.mimetype === 'text/plain') {
-        documentText = `\n\n[Text File Content]:\n${file.buffer.toString('utf-8')}`;
+        const text = file.buffer.toString('utf-8');
+        // console.log(`[TXT Parse] Success — Characters: ${text.length}`);
+        documentText = `\n\n=== TEXT FILE ===\nFilename: ${file.originalname}\n\n--- CONTENT START ---\n${text}\n--- CONTENT END ---`;
+      } else {
+        // console.log(`[File Upload] Unsupported file type: ${file.mimetype}`);
       }
     }
 
@@ -396,7 +420,10 @@ router.post('/chat', upload.array('files'), async (req, res) => {
         },
         body: JSON.stringify({
           model: MODELS[model],
-          messages: messages.filter(m => typeof m.content === 'string').map(m => ({ role: m.role, content: m.content })),
+          messages: messages.map(m => {
+            if (typeof m.content === 'string') return { role: m.role, content: m.content };
+            return { role: m.role, content: m.content }; // Pass multimodal array exactly as is
+          }),
           stream: true
         })
       });
@@ -482,10 +509,14 @@ router.post('/chat', upload.array('files'), async (req, res) => {
     // Handle Claude Opus via Bytez
     else if (model === 'claude-opus') {
       const bytezModel = bytez.model(MODELS[model]);
-      const bytezMessages = messages.filter(m => m.role !== 'system' && typeof m.content === 'string').map(m => ({
-        role: m.role,
-        content: m.content
-      }));
+      const bytezMessages = messages.filter(m => m.role !== 'system').map(m => {
+        let content = m.content;
+        if (typeof content !== 'string') {
+          const textPart = content.find(c => c.type === 'text');
+          content = textPart ? textPart.text : '';
+        }
+        return { role: m.role, content };
+      });
       
       const { error, output } = await bytezModel.run(bytezMessages);
       if (error) throw new Error(error);
@@ -523,10 +554,16 @@ router.post('/chat', upload.array('files'), async (req, res) => {
 
 `);
     }
-    // Handle Groq models
+    // Handle Groq models (Text only)
     else {
       const groqConfig = {
-        messages,
+        messages: messages.map(m => {
+          // Groq strict string requirement
+          if (typeof m.content === 'string') return m;
+          // Extract just the text prompt, ignore the image
+          const textPart = m.content.find(c => c.type === 'text');
+          return { role: m.role, content: textPart ? textPart.text : '' };
+        }),
         model: MODELS[model] || MODELS['llama-maverick'],
         temperature: model === 'qwen-32b' ? 0.6 : 1,
         max_completion_tokens: 4096,

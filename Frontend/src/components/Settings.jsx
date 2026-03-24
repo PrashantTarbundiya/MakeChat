@@ -175,11 +175,31 @@ export const Settings = ({ user, isOpen, setIsOpen, onLogout }) => {
 
   if (!user || user.id === 'guest' || !isOpen) return null;
 
-  // Prepare sorted usage data
-  const sortedStats = usageStats?.stats
-    ? Object.entries(usageStats.stats)
-        .sort(([, a], [, b]) => b.count - a.count)
-    : [];
+  // Prepare sorted usage data including models with 0 usage
+  const allModelsStats = { ...MODEL_LABELS };
+  // Initialize all with 0 count
+  Object.keys(allModelsStats).forEach(modelId => {
+    allModelsStats[modelId] = { count: 0, lastUsed: null, ...allModelsStats[modelId] };
+  });
+  
+  // Merge actual usage
+  if (usageStats?.stats) {
+    Object.entries(usageStats.stats).forEach(([modelId, data]) => {
+      if (!allModelsStats[modelId]) {
+        allModelsStats[modelId] = { name: modelId, emoji: '🤖', count: 0, lastUsed: null };
+      }
+      allModelsStats[modelId].count = data.count;
+      allModelsStats[modelId].lastUsed = data.lastUsed;
+    });
+  }
+
+  const sortedStats = Object.entries(allModelsStats)
+    .sort(([, a], [, b]) => {
+      // Sort by count descending, then alphabetically by name
+      if (b.count !== a.count) return b.count - a.count;
+      return a.name.localeCompare(b.name);
+    });
+
   const maxCount = sortedStats.length > 0 ? sortedStats[0][1].count : 0;
 
   return (
@@ -265,6 +285,7 @@ export const Settings = ({ user, isOpen, setIsOpen, onLogout }) => {
                 <div className="space-y-2.5 max-h-[40vh] overflow-y-auto pr-1">
                   {sortedStats.map(([modelId, data], index) => {
                     const label = MODEL_LABELS[modelId] || { name: modelId, emoji: '🤖' };
+                    // Avoid NaN if maxCount is 0
                     const percentage = maxCount > 0 ? (data.count / maxCount) * 100 : 0;
                     return (
                       <div key={modelId} className="group">

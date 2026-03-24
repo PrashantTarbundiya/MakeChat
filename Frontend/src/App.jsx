@@ -153,11 +153,17 @@ function App({ user, isShared = false }) {
         }
       }
 
-      // If upload failed after retries, don't send message
+      // If upload failed: block only for images (they need a visible URL)
+      // For documents (PDF, DOCX, TXT), proceed anyway — backend will parse the file directly
       if (!uploadedFileUrl) {
-        setIsLoading(false);
-        alert('File upload failed. Please try again.');
-        return;
+        if (file.type.startsWith('image/')) {
+          setIsLoading(false);
+          alert('Image upload failed. Please try again.');
+          return;
+        } else {
+          // Document file — still show filename in chat, backend will parse it
+          uploadedFileInfo = `📄 ${file.name}\n\n`;
+        }
       }
     }
 
@@ -251,10 +257,11 @@ function App({ user, isShared = false }) {
         }];
       });
       setCurrentResponse('');
-      setCurrentThinking('');
     } catch (error) {
       if (error.name === 'AbortError') {
-        if (currentResponse) {
+        // Only append partial message if manually stopped, not if navigated away to a new/different chat
+        const isNavigation = abortControllerRef.current?.signal?.reason === 'navigation';
+        if (!isNavigation && currentResponse) {
           const cleanResponse = currentResponse.replace(/<\d+\/\d+>/g, '').trim();
           setMessages(prev => [...prev, { role: 'assistant', content: cleanResponse + ' [Stopped]', model }]);
         }
@@ -430,14 +437,22 @@ function App({ user, isShared = false }) {
       return;
     }
 
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort('navigation');
+    }
+    setIsLoading(false);
     setMessages([]);
     setCurrentResponse('');
-    setCurrentThinking('');
     setCurrentChatId(null);
     setThinkingPanel(null);
   };
 
   const handleSelectChat = async (chatId) => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort('navigation');
+    }
+    setIsLoading(false);
+    
     const specialModels = ['bytez-image', 'bytez-video', 'bytez-audio', 'bytez-music', 'llm-council'];
     if (specialModels.includes(chatId)) {
       // For special models, just clear the chat without authentication check
