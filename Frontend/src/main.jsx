@@ -36,7 +36,7 @@ const Root = () => {
           <Route path="/signup" element={!user ? <Signup onSignup={setUser} /> : <Navigate to="/chat" />} />
           <Route path="/auth/google/callback" element={<GoogleCallback />} />
           <Route path="/share/:token" element={<App user={user} isShared={true} />} />
-          <Route path="/chat" element={user ? <App user={user} /> : <Navigate to="/login" />} />
+          <Route path="/chat/:chatId?" element={user ? <App user={user} /> : <Navigate to="/login" />} />
         </Routes>
       </BrowserRouter>
     </GoogleOAuthProvider>

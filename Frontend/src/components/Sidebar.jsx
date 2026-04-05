@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Menu, X, Plus, MessageSquare, Settings, Trash2, Edit2, Share2, MoreVertical, Search, Sparkles } from 'lucide-react';
 import { ModelsModal } from './ModelsModal';
 
-export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId, refreshTrigger, isOpen, setIsOpen, onOpenSettings }) => {
+export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId, backgroundGenerations, refreshTrigger, isOpen, setIsOpen, onOpenSettings }) => {
   const [chats, setChats] = useState([]);
   const [menuOpen, setMenuOpen] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -205,6 +205,9 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
                     <button onClick={() => onSelectChat(chat._id)} className="flex items-center gap-2 flex-1 min-w-0 text-left">
                       <MessageSquare className="w-4 h-4 flex-shrink-0" />
                       <span className="truncate text-sm">{chat.title}</span>
+                      {backgroundGenerations?.has(chat._id) && (
+                        <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse flex-shrink-0"></span>
+                      )}
                     </button>
                     <button onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === chat._id ? null : chat._id); }} className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1 hover:bg-white/10 rounded">
                       <MoreVertical className="w-4 h-4" />

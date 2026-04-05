@@ -2,10 +2,92 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Copy, Check, ChevronDown, ChevronRight, X, Maximize2, ZoomIn, ZoomOut, Download, Maximize, Sun, Moon } from 'lucide-react';
+import { Copy, Check, ChevronDown, ChevronRight, X, Maximize2, ZoomIn, ZoomOut, Download, Maximize, Sun, Moon, ArrowUp } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import mermaid from 'mermaid';
+import { ChartView } from './Charts';
+
+/* Try to parse potentially-malformed JSON from LLM */
+const parseChartJSON = (raw) => {
+  try { return JSON.parse(raw); } catch {}
+
+  // Remove JS comments, trailing commas, unquoted keys
+  let cleaned = raw
+    .replace(/\/\/.*$/gm, '')                           // single-line comments
+    .replace(/\/\*[\s\S]*?\*\//g, '')                   // multi-line comments
+    .replace(/,\s*}/g, '}').replace(/,\s*]/g, ']')     // trailing commas
+    .replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":');        // unquoted keys
+
+  // Normalize single quotes to double quotes
+  cleaned = cleaned.replace(/'/g, '"');
+
+  try { return JSON.parse(cleaned); } catch {}
+  return null;
+};
+
+const ChartBlockRenderer = ({ codeString }) => {
+  const [rawJson, setRawJson] = useState(codeString);
+  const [editing, setEditing] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const parsed = parseChartJSON(rawJson);
+
+  return (
+    <div className="my-4">
+      {parsed ? (
+        <ChartView data={parsed} />
+      ) : (
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 overflow-hidden">
+          <div className="px-4 py-2 text-red-400 text-xs font-medium border-b border-red-500/20">
+            ⚠️ Could not parse chart data
+          </div>
+          <div className="p-4">
+            {errorMsg && <p className="text-[11px] text-red-300/80 mb-2">{errorMsg}</p>}
+            {editing ? (
+              <div className="space-y-2">
+                <textarea
+                  value={rawJson}
+                  onChange={(e) => setRawJson(e.target.value)}
+                  className="w-full h-32 bg-black/30 border border-white/20 rounded-lg p-2 text-[11px] text-gray-300 font-mono resize-y"
+                  placeholder="Paste or fix JSON here..."
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      const p = parseChartJSON(rawJson);
+                      if (p) { setEditing(false); setErrorMsg(''); }
+                      else setErrorMsg('Still invalid JSON. Check quotes, commas, and braces.');
+                    }}
+                    className="px-3 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 text-xs rounded-lg"
+                  >
+                    ✓ Try Again
+                  </button>
+                  <button
+                    onClick={() => setEditing(false)}
+                    className="px-3 py-1 bg-white/10 hover:bg-white/20 text-gray-400 text-xs rounded-lg"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] text-gray-500">The LLM returned malformed JSON. Fix it below:</p>
+                <button
+                  onClick={() => setEditing(true)}
+                  className="px-3 py-1 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 text-xs rounded-lg"
+                >
+                  ✏️ Fix JSON
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 mermaid.initialize({
   startOnLoad: false,
@@ -40,35 +122,36 @@ const MermaidDiagram = ({ chart }) => {
     renderCountRef.current += 1;
     const uniqueId = `${idRef.current}-${renderCountRef.current}`;
     mermaid.initialize({ startOnLoad: false, theme: theme === 'dark' ? 'dark' : 'default', securityLevel: 'loose' });
-    
-    // Clean up any leftover mermaid error elements from DOM
-    const cleanup = () => {
-      document.querySelectorAll('[id^="d"][id*="mermaid"]').forEach(el => {
-        if (el.closest('.mermaid-container')) return; // skip our own containers
-        el.remove();
-      });
-      // Remove any mermaid error divs
-      document.querySelectorAll('.error-icon, .error-text, [id*="-syntax-error"]').forEach(el => el.closest('svg')?.remove());
-      document.querySelectorAll(`#${CSS.escape(uniqueId)}, #${CSS.escape(uniqueId)}-retry`).forEach(el => el.remove());
-    };
+
+    // Create a temporary detached container so mermaid has a real DOM node
+    const tempDiv = document.createElement('div');
+    tempDiv.style.display = 'none';
+    tempDiv.style.position = 'absolute';
+    tempDiv.style.left = '-9999px';
+    tempDiv.style.top = '-9999px';
+    document.body.appendChild(tempDiv);
 
     try {
       const { svg: renderedSvg } = await mermaid.render(uniqueId, chart);
       setSvg(renderedSvg);
       setError(false);
     } catch (err) {
-      cleanup();
       try {
         const sanitized = sanitizeChart(chart);
-        const retryId = `${uniqueId}-retry`;
-        const { svg: renderedSvg } = await mermaid.render(retryId, sanitized);
+        const { svg: renderedSvg } = await mermaid.render(`${uniqueId}-retry`, sanitized);
         setSvg(renderedSvg);
         setError(false);
       } catch (retryErr) {
-        cleanup();
         console.error('Mermaid rendering failed', retryErr);
         setError(true);
       }
+    } finally {
+      // Remove the temp container and any leftover mermaid elements
+      const leftover = document.getElementById(uniqueId);
+      leftover?.remove();
+      const leftoverRetry = document.getElementById(`${uniqueId}-retry`);
+      leftoverRetry?.remove();
+      tempDiv.remove();
     }
   };
 
@@ -451,7 +534,7 @@ export const MessageBubble = ({ content, role }) => {
         </div>
       )}
       {hasMediaHTML ? (
-        <div ref={mediaRef} dangerouslySetInnerHTML={{ __html: answer }} />
+        <div ref={mediaRef} dangerouslySetInnerHTML={{ __html: filteredAnswer }} />
       ) : (
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
@@ -463,6 +546,11 @@ export const MessageBubble = ({ content, role }) => {
 
               if (match && match[1].toLowerCase() === 'mermaid') {
                 return <MermaidDiagram chart={codeString} />;
+              }
+
+              // Render inline chart from ```chart blocks
+              if (match && match[1].toLowerCase() === 'chart') {
+                return <ChartBlockRenderer codeString={codeString} />;
               }
 
               return !inline && match ? (

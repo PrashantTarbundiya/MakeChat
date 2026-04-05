@@ -11,11 +11,14 @@ import { Header } from "@/components/Header";
 import { QueryOutline } from "@/components/QueryOutline";
 import { Spotlight } from "@/components/landing/Spotlight";
 import { useState, useRef, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 
 import toast, { Toaster } from 'react-hot-toast';
 
 function App({ user, isShared = false }) {
+  const { chatId } = useParams();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState([]);
   const [currentResponse, setCurrentResponse] = useState('');
@@ -35,6 +38,11 @@ function App({ user, isShared = false }) {
   const abortControllerRef = useRef(null);
   const lastUserMessageRef = useRef(null);
   const messageRefs = useRef({});
+  const activeChatIdRef = useRef(null);
+  const [backgroundGenerations, setBackgroundGenerations] = useState(new Set());
+  const backgroundChatMessagesRef = useRef(new Map());
+  const backgroundCurrentResponseRef = useRef(new Map());
+  const pendingNewChatRef = useRef(false);
 
   const handleScrollToMessage = (index) => {
     const el = messageRefs.current[index];
@@ -69,6 +77,7 @@ function App({ user, isShared = false }) {
         if (response.ok) {
           const forkedChat = await response.json();
           setCurrentChatId(forkedChat._id);
+          activeChatIdRef.current = forkedChat._id;
           setIsForked(true);
           window.history.replaceState({}, '', '/');
         }
@@ -167,7 +176,66 @@ function App({ user, isShared = false }) {
       }
     }
 
-    setMessages(prev => [...prev, { role: 'user', content: cleanMessage + uploadedFileInfo, mode: isSearch ? 'search' : isThink ? 'think' : isCanvas ? 'canvas' : 'normal', filePublicId: uploadedFilePublicId }]);
+    // Determine the chatId to use for this request
+    let requestChatId = currentChatId;
+    const token = localStorage.getItem('token');
+
+    // If we don't have a chatId yet, save the user message immediately to create a new chat
+    if (!requestChatId) {
+      try {
+        const userMessageObj = {
+          role: 'user',
+          content: cleanMessage + uploadedFileInfo,
+          mode: isSearch ? 'search' : isThink ? 'think' : isCanvas ? 'canvas' : 'normal',
+          filePublicId: uploadedFilePublicId
+        };
+        const saveResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/chat/save`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            chatId: null,
+            messages: [userMessageObj],
+            title: cleanMessage.slice(0, 50) || 'New Chat'
+          })
+        });
+
+        if (saveResponse.ok) {
+          const chat = await saveResponse.json();
+          requestChatId = chat._id;
+          setCurrentChatId(requestChatId);
+          activeChatIdRef.current = requestChatId;
+        } else {
+          console.error('Failed to create chat');
+          setIsLoading(false);
+          setCurrentResponse('');
+          return;
+        }
+      } catch (error) {
+        console.error('Failed to save initial message:', error);
+        setIsLoading(false);
+        setCurrentResponse('');
+        return;
+      }
+    }
+
+    // Create user message object
+    const userMessage = {
+      role: 'user',
+      content: cleanMessage + uploadedFileInfo,
+      mode: isSearch ? 'search' : isThink ? 'think' : isCanvas ? 'canvas' : 'normal',
+      filePublicId: uploadedFilePublicId
+    };
+
+    // Add user message to state and store snapshot for potential background save
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
+    backgroundChatMessagesRef.current.set(requestChatId, updatedMessages);
+
+    // Mark this chat as generating in the background
+    setBackgroundGenerations(prev => new Set(prev).add(requestChatId));
 
     setTimeout(() => {
       lastUserMessageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -180,7 +248,7 @@ function App({ user, isShared = false }) {
       formData.append('message', message);
       formData.append('model', model);
       formData.append('userId', user?.id || 'guest');
-      if (currentChatId) formData.append('chatId', currentChatId);
+      if (requestChatId) formData.append('chatId', requestChatId);
       if (uploadedFileUrl) {
         formData.append('fileUrl', uploadedFileUrl);
         formData.append('filePublicId', uploadedFilePublicId);
@@ -220,7 +288,11 @@ function App({ user, isShared = false }) {
               } else if (parsed.content) {
                 fullResponse += parsed.content;
               }
-              setCurrentResponse(fullResponse.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/<think>[\s\S]*$/g, ''));
+              const displayResponse = fullResponse.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/<think>[\s\S]*$/g, '');
+              backgroundCurrentResponseRef.current.set(requestChatId, displayResponse);
+              if (activeChatIdRef.current === requestChatId) {
+                setCurrentResponse(displayResponse);
+              }
             } catch (e) { }
           }
         }
@@ -241,44 +313,98 @@ function App({ user, isShared = false }) {
       // Store thinking if present
       const hasThinking = extractedThinking && extractedThinking.trim().length > 0;
 
-      setMessages(prev => {
-        const lastMsg = prev[prev.length - 1];
-        const versions = lastMsg?.versions || [];
-        versions.push(cleanResponse);
+      const assistantMsg = {
+        role: 'assistant',
+        content: cleanResponse,
+        model,
+        mode: isSearch ? 'search' : isThink ? 'think' : isCanvas ? 'canvas' : 'normal',
+        thinking: hasThinking ? extractedThinking : undefined,
+        versions: [cleanResponse],
+        currentVersion: 0
+      };
 
-        return [...prev, {
-          role: 'assistant',
-          content: cleanResponse,
-          model,
-          mode: isSearch ? 'search' : isThink ? 'think' : isCanvas ? 'canvas' : 'normal',
-          thinking: hasThinking ? extractedThinking : undefined,
-          versions,
-          currentVersion: versions.length - 1
-        }];
-      });
+      // Check if the current active chat is the one we're generating for
+      if (activeChatIdRef.current === requestChatId) {
+        // Still active, update UI
+        setMessages(prev => [...prev, assistantMsg]);
+      } else {
+        // User navigated away, save silently in background
+        const savedMsgs = backgroundChatMessagesRef.current.get(requestChatId) || [];
+        const fullMessages = [...savedMsgs, assistantMsg];
+        const title = savedMsgs[0]?.content?.slice(0, 50) || 'New Chat';
+        await performSaveChat(requestChatId, fullMessages, title);
+      }
+
       setCurrentResponse('');
     } catch (error) {
       if (error.name === 'AbortError') {
-        // Only append partial message if manually stopped, not if navigated away to a new/different chat
+        // Only append partial message if manually stopped
         const isNavigation = abortControllerRef.current?.signal?.reason === 'navigation';
         if (!isNavigation && currentResponse) {
           const cleanResponse = currentResponse.replace(/<\d+\/\d+>/g, '').trim();
-          setMessages(prev => [...prev, { role: 'assistant', content: cleanResponse + ' [Stopped]', model }]);
+          // If still active, show stopped message. If background, maybe save partial? For simplicity, treat same: if active, update UI; else save background.
+          const partialMsg = {
+            role: 'assistant',
+            content: cleanResponse + ' [Stopped]',
+            model,
+            versions: [cleanResponse + ' [Stopped]'],
+            currentVersion: 0
+          };
+          if (activeChatIdRef.current === requestChatId) {
+            setMessages(prev => [...prev, partialMsg]);
+          } else {
+            const savedMsgs = backgroundChatMessagesRef.current.get(requestChatId) || [];
+            const fullMessages = [...savedMsgs, partialMsg];
+            const title = savedMsgs[0]?.content?.slice(0, 50) || 'New Chat';
+            await performSaveChat(requestChatId, fullMessages, title);
+          }
         }
         setCurrentResponse('');
       } else {
         console.error('Error:', error);
       }
-    } finally {
-      setIsLoading(false);
-      setLoadingState('');
-      abortControllerRef.current = null;
+      } finally {
+        if (activeChatIdRef.current === requestChatId) {
+          setIsLoading(false);
+          setLoadingState('');
+          abortControllerRef.current = null;
+        }
+      // Cleanup background tracking
+      backgroundChatMessagesRef.current.delete(requestChatId);
+      backgroundCurrentResponseRef.current.delete(requestChatId);
+      setBackgroundGenerations(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(requestChatId);
+        return newSet;
+      });
     }
   };
 
   const handleStop = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
+    }
+  };
+
+  const performSaveChat = async (chatId, messagesToSave, title) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      await fetch(`${import.meta.env.VITE_API_URL}/api/chat/save`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          chatId,
+          messages: messagesToSave,
+          title: title || 'New Chat'
+        })
+      });
+    } catch (error) {
+      console.error('Background save failed:', error);
     }
   };
 
@@ -293,10 +419,16 @@ function App({ user, isShared = false }) {
       // Remove last assistant message and regenerate without adding user message again
       setMessages(prev => prev.slice(0, -1));
 
+      // Determine the chatId we're regenerating for
+      const requestChatId = currentChatId;
+      // Store snapshot of messages (without the removed assistant message)
+      const snapshotMessages = messages.slice(0, -1);
+      backgroundChatMessagesRef.current.set(requestChatId, snapshotMessages);
+      setBackgroundGenerations(prev => new Set(prev).add(requestChatId));
+
       // Call the API directly without adding user message
       setIsLoading(true);
       setCurrentResponse('');
-      setCurrentThinking('');
       abortControllerRef.current = new AbortController();
 
       try {
@@ -335,14 +467,17 @@ function App({ user, isShared = false }) {
                 const parsed = JSON.parse(data);
                 if (parsed.reasoning) {
                   thinkingText += parsed.reasoning;
-                  setCurrentThinking(thinkingText);
                 }
                 if (isMediaModel && parsed.content?.includes('media-container')) {
                   fullResponse = parsed.content;
                 } else if (parsed.content) {
                   fullResponse += parsed.content;
                 }
-                setCurrentResponse(fullResponse.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/<think>[\s\S]*$/g, ''));
+                const displayResponse = fullResponse.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/<think>[\s\S]*$/g, '');
+                backgroundCurrentResponseRef.current.set(requestChatId, displayResponse);
+                if (activeChatIdRef.current === requestChatId) {
+                  setCurrentResponse(displayResponse);
+                }
               } catch (e) { }
             }
           }
@@ -363,7 +498,7 @@ function App({ user, isShared = false }) {
         // Add new version
         const newVersions = [...versions, cleanResponse];
 
-        setMessages(prev => [...prev, {
+        const assistantMsg = {
           role: 'assistant',
           content: cleanResponse,
           model: lastAssistantMsg.model || selectedModel,
@@ -371,21 +506,58 @@ function App({ user, isShared = false }) {
           thinking: hasThinking ? extractedThinking : undefined,
           versions: newVersions,
           currentVersion: newVersions.length - 1
-        }]);
+        };
+
+        if (activeChatIdRef.current === requestChatId) {
+          // Still active, update UI
+          setMessages(prev => [...prev, assistantMsg]);
+        } else {
+          // User navigated away, save silently in background
+          const savedMsgs = backgroundChatMessagesRef.current.get(requestChatId) || [];
+          const fullMessages = [...savedMsgs, assistantMsg];
+          const title = savedMsgs[0]?.content?.slice(0, 50) || 'New Chat';
+          await performSaveChat(requestChatId, fullMessages, title);
+        }
+
         setCurrentResponse('');
       } catch (error) {
         if (error.name === 'AbortError') {
+          // Only append partial message if manually stopped
           if (currentResponse) {
             const cleanResponse = currentResponse.replace(/<\d+\/\d+>/g, '').trim();
-            setMessages(prev => [...prev, { role: 'assistant', content: cleanResponse + ' [Stopped]', model: lastAssistantMsg.model || selectedModel }]);
+            const partialMsg = {
+              role: 'assistant',
+              content: cleanResponse + ' [Stopped]',
+              model: lastAssistantMsg.model || selectedModel,
+              versions: [cleanResponse + ' [Stopped]'],
+              currentVersion: 0
+            };
+            if (activeChatIdRef.current === requestChatId) {
+              setMessages(prev => [...prev, partialMsg]);
+            } else {
+              const savedMsgs = backgroundChatMessagesRef.current.get(requestChatId) || [];
+              const fullMessages = [...savedMsgs, partialMsg];
+              const title = savedMsgs[0]?.content?.slice(0, 50) || 'New Chat';
+              await performSaveChat(requestChatId, fullMessages, title);
+            }
           }
           setCurrentResponse('');
         } else {
           console.error('Error:', error);
         }
       } finally {
-        setIsLoading(false);
-        abortControllerRef.current = null;
+        if (activeChatIdRef.current === requestChatId) {
+          setIsLoading(false);
+          setLoadingState('');
+          abortControllerRef.current = null;
+        }
+        // Cleanup background tracking
+        backgroundChatMessagesRef.current.delete(requestChatId);
+        setBackgroundGenerations(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(requestChatId);
+          return newSet;
+        });
       }
     }
   };
@@ -431,39 +603,44 @@ function App({ user, isShared = false }) {
   };
 
   const handleNewChat = () => {
+    // Cancel any pending new chat auto-select
+    pendingNewChatRef.current = false;
+
     // Check if user is authenticated when trying to create a new chat
     if (!user || user.id === 'guest' || !localStorage.getItem('token')) {
       window.location.href = '/login';
       return;
     }
 
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort('navigation');
-    }
     setIsLoading(false);
     setMessages([]);
     setCurrentResponse('');
+    activeChatIdRef.current = null; // Update ref immediately to avoid race condition
     setCurrentChatId(null);
     setThinkingPanel(null);
   };
 
   const handleSelectChat = async (chatId) => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort('navigation');
-    }
+    // Cancel any pending new chat auto-select
+    pendingNewChatRef.current = false;
+
     setIsLoading(false);
-    
+    setCurrentResponse('');
+
     const specialModels = ['bytez-image', 'bytez-video', 'bytez-audio', 'bytez-music', 'llm-council'];
     if (specialModels.includes(chatId)) {
       // For special models, just clear the chat without authentication check
       setMessages([]);
       setCurrentResponse('');
+      activeChatIdRef.current = null;
       setCurrentChatId(null);
       setThinkingPanel(null);
       setSelectedModel(chatId);
       return;
     }
     setThinkingPanel(null);
+    // Immediately set active chat ref to avoid race conditions with background generation
+    activeChatIdRef.current = chatId;
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -489,6 +666,12 @@ function App({ user, isShared = false }) {
         setCurrentChatId(chatId);
         toast.remove();
         toast.success('Chat loaded successfully');
+        
+        if (backgroundGenerations.has(chatId)) {
+          setIsLoading(true);
+          setLoadingState('✨ Generating response...');
+          setCurrentResponse(backgroundCurrentResponseRef.current.get(chatId) || '');
+        }
       } else {
         toast.remove();
         toast.error('Failed to load chat');
@@ -533,7 +716,10 @@ function App({ user, isShared = false }) {
 
       if (response.ok) {
         const chat = await response.json();
-        if (!currentChatId) setCurrentChatId(chat._id);
+        if (!currentChatId) {
+          setCurrentChatId(chat._id);
+          activeChatIdRef.current = chat._id;
+        }
         // Update cache - move edited chat to top
         const cachedChats = JSON.parse(localStorage.getItem('cachedChats') || '[]');
         const filteredChats = cachedChats.filter(c => c._id !== chat._id);
@@ -583,6 +769,24 @@ function App({ user, isShared = false }) {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [messages, currentChatId, user, isShared]);
 
+  useEffect(() => {
+    activeChatIdRef.current = currentChatId;
+    if (!isShared) {
+      if (currentChatId && currentChatId !== chatId) {
+        navigate(`/chat/${currentChatId}`, { replace: true });
+      } else if (!currentChatId && chatId) {
+        navigate(`/chat`, { replace: true });
+      }
+    }
+  }, [currentChatId, chatId, navigate, isShared]);
+
+  useEffect(() => {
+    if (chatId && chatId !== currentChatId && user?.id !== 'guest' && !isShared) {
+      // Small timeout to let Sidebar fetch component data if needed, or just let handleSelectChat fetch
+      handleSelectChat(chatId);
+    }
+  }, [chatId, user, isShared]);
+
   return (
     <div className="flex w-full h-screen bg-black overflow-hidden relative">
       <Spotlight />
@@ -594,6 +798,7 @@ function App({ user, isShared = false }) {
         onNewChat={handleNewChat}
         onSelectChat={handleSelectChat}
         currentChatId={currentChatId}
+        backgroundGenerations={backgroundGenerations}
         refreshTrigger={messages.length}
         isOpen={sidebarOpen}
         setIsOpen={setSidebarOpen}
@@ -722,11 +927,32 @@ function App({ user, isShared = false }) {
               );
             })}
             {isLoading && !currentResponse && loadingState && (
-              <div className="flex justify-start">
-                <div className="bg-white/5 rounded-2xl px-4 py-3 text-white/70 text-sm">
-                  <style>{`@keyframes dots{0%,20%{content:''}40%{content:'.'}60%{content:'..'}80%,100%{content:'...'}}`}</style>
+              <div className="flex flex-col gap-3 justify-start">
+                <div className="bg-white/5 rounded-2xl px-4 py-3 text-white/70 text-sm self-start">
+                  <style>
+                    {`
+                      @keyframes dots{0%,20%{content:''}40%{content:'.'}60%{content:'..'}80%,100%{content:'...'}}
+                      @keyframes shimmer{100%{transform:translateX(100%)}}
+                    `}
+                  </style>
                   <span>{loadingState.replace('...', '')}<span className="inline-block" style={{ animation: 'dots 1.5s infinite' }}></span></span>
                 </div>
+                {['bytez-image', 'bytez-video'].includes(selectedModel) && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="w-[300px] h-[300px] sm:w-[400px] sm:h-[400px] bg-[#1F2023] rounded-2xl flex items-center justify-center border border-white/5 overflow-hidden relative shadow-lg"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full" style={{ animation: 'shimmer 2s infinite' }} />
+                    <div className="flex flex-col items-center gap-4 text-white/20 relative z-10">
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <polyline points="21 15 16 10 5 21" />
+                      </svg>
+                    </div>
+                  </motion.div>
+                )}
               </div>
             )}
             {currentResponse && !currentResponse.includes('media-container') && (
