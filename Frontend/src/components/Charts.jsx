@@ -1,394 +1,374 @@
-import { useState } from 'react';
+import React, { useState, useEffect, useRef, Component } from 'react';
+import ReactECharts from 'echarts-for-react';
+import * as echarts from 'echarts';
+import { Maximize2, X, ZoomIn, ZoomOut, Maximize, Sun, Moon } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
-/* Vibrant, high-contrast palettes for different chart types */
-const PALETTE_VIBRANT = ['#ff6b6b', '#feca57', '#48dbfb', '#ff9ff3', '#54a0ff', '#5f27cd', '#01a3a4', '#f368e0', '#ff6348', '#2ed573'];
-const pick = (i) => PALETTE_VIBRANT[i % PALETTE_VIBRANT.length];
+// Pre-fetch world map geometry if needed by the chart
+let worldMapRegistered = false;
+let fetchingMap = false;
 
-/* Safe number coercion */
-const num = (v) => {
-  const n = Number(v);
-  return isNaN(n) ? 0 : n;
-};
-
-/* ─── Bar Chart ─── */
-const BarChart = ({ data }) => {
-  const [hovered, setHovered] = useState(null);
-  const values = (data.values || []).map(num);
-  const labels = data.labels || [];
-  const title = data.title || '';
-  const maxVal = Math.max(...values, 1);
-
-  return (
-    <div className="my-4 rounded-xl border border-white/10 bg-[#1a1a1a] p-4">
-      {title && <p className="text-sm font-semibold text-white mb-2">{title}</p>}
-      <div className="flex items-end gap-2 h-[180px] px-2">
-        {values.map((v, i) => {
-          const pct = (v / maxVal) * 100;
-          return (
-            <div
-              key={i}
-              className="flex-1 flex flex-col justify-end items-center relative"
-              style={{ height: '160px' }}
-              onMouseEnter={() => setHovered(i)}
-              onMouseLeave={() => setHovered(null)}
-            >
-              <div
-                className="w-full rounded-t-md transition-all duration-200 hover:opacity-80"
-                style={{ height: `${pct}%`, backgroundColor: pick(i), minHeight: 2 }}
-              />
-              {hovered === i && (
-                <div className="absolute -top-5 bg-black/80 text-white text-[10px] px-2 py-0.5 rounded whitespace-nowrap z-10">
-                  {labels[i] || i}: {v}
-                </div>
-              )}
-              <span className="text-[10px] text-gray-500 truncate max-w-full mt-1">{String(labels[i] || '')}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-/* ─── Horizontal Bar Chart ─── */
-const HBarChart = ({ data }) => {
-  const [hovered, setHovered] = useState(null);
-  const values = (data.values || []).map(num);
-  const labels = data.labels || [];
-  const title = data.title || '';
-  const maxVal = Math.max(...values, 1);
-
-  return (
-    <div className="my-4 rounded-xl border border-white/10 bg-[#1a1a1a] p-4">
-      {title && <p className="text-sm font-semibold text-white mb-2">{title}</p>}
-      <div className="space-y-2">
-        {values.map((v, i) => (
-          <div key={i} className="flex items-center gap-2"
-            onMouseEnter={() => setHovered(i)}
-            onMouseLeave={() => setHovered(null)}
-          >
-            <span className="text-[11px] text-gray-400 w-20 text-right truncate">{String(labels[i] || '')}</span>
-            <div className="flex-1 bg-gray-800 rounded-full h-5 overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all duration-500"
-                style={{ width: `${(v / maxVal) * 100}%`, backgroundColor: pick(i) }}
-              />
-            </div>
-            <span className="text-[11px] text-gray-300 w-8">{v}</span>
+// ─── Error Boundary to catch ECharts runtime crashes ───
+class ChartErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('Chart crashed:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="my-4 rounded-lg border border-red-500/30 bg-red-500/10 overflow-hidden">
+          <div className="px-4 py-2 text-red-500 text-[11px] font-medium border-b border-red-500/20 flex items-center justify-between">
+            <span>⚠️ Chart Rendering Failed</span>
+            <span className="opacity-70">Click 'Regenerate' below to fix</span>
           </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-/* ─── Pie Chart ─── */
-const pieSlicePath = (cx, cy, r, startAngle, endAngle) => {
-  const x1 = cx + r * Math.cos(startAngle);
-  const y1 = cy + r * Math.sin(startAngle);
-  const x2 = cx + r * Math.cos(endAngle);
-  const y2 = cy + r * Math.sin(endAngle);
-  const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
-  return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
-};
-
-const PieChart = ({ data }) => {
-  const [hovered, setHovered] = useState(null);
-  const values = (data.values || []).map(num);
-  const labels = data.labels || [];
-  const title = data.title || '';
-  const total = values.reduce((a, b) => a + b, 1);
-  const r = 80;
-  const cx = 120;
-  const cy = 120;
-
-  let cumAngle = -Math.PI / 2;
-
-  return (
-    <div className="my-4 rounded-xl border border-white/10 bg-[#1a1a1a] p-4">
-      {title && <p className="text-sm font-semibold text-white mb-2">{title}</p>}
-      <div className="flex items-center justify-center gap-6">
-        <svg viewBox="0 0 240 240" className="w-44 h-44">
-          {values.map((v, i) => {
-            const slice = (v / total) * 2 * Math.PI;
-            const start = cumAngle;
-            const end = cumAngle + slice;
-            cumAngle = end;
-            const isHovered = hovered === i;
-            return (
-              <path
-                key={i}
-                d={pieSlicePath(cx, cy, isHovered ? r + 6 : r, start, end)}
-                fill={pick(i)}
-                className="transition-all duration-200"
-                style={{ opacity: hovered !== null && hovered !== i ? 0.5 : 1 }}
-                onMouseEnter={() => setHovered(i)}
-                onMouseLeave={() => setHovered(null)}
-              />
-            );
-          })}
-        </svg>
-        <div className="space-y-1">
-          {labels.map((l, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: pick(i) }} />
-              <span className="text-[11px] text-gray-300">{String(l || `Item ${i + 1}`)}</span>
-              <span className="text-[11px] text-gray-500">({values[i]})</span>
-            </div>
-          ))}
+          <pre className="p-4 text-gray-300 text-xs overflow-x-auto whitespace-pre-wrap max-h-40">
+            {this.state.error?.message || 'Unknown error'}
+          </pre>
         </div>
-      </div>
-    </div>
-  );
-};
+      );
+    }
+    return this.props.children;
+  }
+}
 
-/* ─── Donut Chart ─── */
-const DonutChart = ({ data }) => {
-  const [hovered, setHovered] = useState(null);
-  const values = (data.values || []).map(num);
-  const labels = data.labels || [];
-  const title = data.title || '';
-  const total = values.reduce((a, b) => a + b, 1);
-  const outerR = 70;
-  const innerR = 44;
-  const cx = 120;
-  const cy = 120;
+// ─── Unsupported series types that will crash ECharts ───
+const UNSUPPORTED_SERIES_TYPES = new Set([
+  'violin', 'chord', 'scatter3D', 'bar3D', 'line3D',
+  'surface', 'globe', 'parallel', 'map3D', 'lines3D',
+  'flowGL', 'graphGL', 'scatterGL', 'linesGL'
+]);
 
-  const donutSlice = (cx, cy, outerR, innerR, startAngle, endAngle) => {
-    const ox1 = cx + outerR * Math.cos(startAngle);
-    const oy1 = cy + outerR * Math.sin(startAngle);
-    const ox2 = cx + outerR * Math.cos(endAngle);
-    const oy2 = cy + outerR * Math.sin(endAngle);
-    const ix1 = cx + innerR * Math.cos(endAngle);
-    const iy1 = cy + innerR * Math.sin(endAngle);
-    const ix2 = cx + innerR * Math.cos(startAngle);
-    const iy2 = cy + innerR * Math.sin(startAngle);
-    const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
-    return `M ${ox1} ${oy1} A ${outerR} ${outerR} 0 ${largeArc} 1 ${ox2} ${oy2} L ${ix1} ${iy1} A ${innerR} ${innerR} 0 ${largeArc} 0 ${ix2} ${iy2} Z`;
+// Only 'world' map is registered
+const ALLOWED_MAPS = new Set(['world']);
+
+// ─── Deep-sanitize ECharts option before rendering ───
+const sanitizeOption = (opt) => {
+  if (!opt || typeof opt !== 'object') return opt;
+  const sanitized = JSON.parse(JSON.stringify(opt)); // deep clone
+
+  // Remove timeline (crashes because component not imported)
+  delete sanitized.timeline;
+
+  // Remove parallelAxis
+  delete sanitized.parallelAxis;
+
+  // Fix xAxis if it's set to type 'timeline'
+  const fixAxis = (axis) => {
+    if (!axis) return axis;
+    if (Array.isArray(axis)) return axis.map(fixAxis);
+    if (axis.type === 'timeline') axis.type = 'category';
+    return axis;
   };
+  sanitized.xAxis = fixAxis(sanitized.xAxis);
+  sanitized.yAxis = fixAxis(sanitized.yAxis);
 
-  let cumAngle = -Math.PI / 2;
+  // Sanitize series
+  if (Array.isArray(sanitized.series)) {
+    sanitized.series = sanitized.series.filter(s => {
+      if (s && UNSUPPORTED_SERIES_TYPES.has(s.type)) {
+        console.warn(`[Charts] Stripped unsupported series type: ${s.type}`);
+        return false;
+      }
+      // Fix map names — only "world" is registered
+      if (s && s.type === 'map' && s.map && !ALLOWED_MAPS.has(s.map)) {
+        console.warn(`[Charts] Map "${s.map}" not registered, forcing "world"`);
+        s.map = 'world';
+      }
+      return true;
+    });
 
-  return (
-    <div className="my-4 rounded-xl border border-white/10 bg-[#1a1a1a] p-4">
-      {title && <p className="text-sm font-semibold text-white mb-2">{title}</p>}
-      <div className="flex items-center justify-center gap-6">
-        <svg viewBox="0 0 240 240" className="w-44 h-44">
-          {values.map((v, i) => {
-            const slice = (v / total) * 2 * Math.PI;
-            const start = cumAngle;
-            const end = cumAngle + slice;
-            cumAngle = end;
-            return (
-              <path
-                key={i}
-                d={donutSlice(cx, cy, hovered === i ? outerR + 5 : outerR, innerR, start, end)}
-                fill={pick(i)}
-                className="transition-all duration-200"
-                style={{ opacity: hovered !== null && hovered !== i ? 0.5 : 1 }}
-                onMouseEnter={() => setHovered(i)}
-                onMouseLeave={() => setHovered(null)}
-              />
-            );
-          })}
-          <text x={cx} y={cy - 4} textAnchor="middle" fill="white" fontSize="14" fontWeight="bold">{total}</text>
-          <text x={cx} y={cy + 12} textAnchor="middle" fill="#6b7280" fontSize="9">Total</text>
-        </svg>
-        <div className="space-y-1">
-          {labels.map((l, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: pick(i) }} />
-              <span className="text-[11px] text-gray-300">{String(l || `Item ${i + 1}`)}</span>
-              <span className="text-[11px] text-gray-500">({values[i]})</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
+    // If all series were stripped, mark as invalid
+    if (sanitized.series.length === 0) return null;
+  }
 
-/* ─── Line Chart ─── */
-const LineChart = ({ data }) => {
-  const [hovered, setHovered] = useState(null);
-  const values = (data.values || []).map(num);
-  const labels = data.labels || [];
-  const title = data.title || '';
-  const maxVal = Math.max(...values, 1);
-  const minVal = Math.min(...values, 0);
-  const range = maxVal - minVal || 1;
-  const w = 300;
-  const h = 150;
-  const pad = 30;
+  // Fix geo references
+  if (sanitized.geo) {
+    if (Array.isArray(sanitized.geo)) {
+      sanitized.geo.forEach(g => {
+        if (g.map && !ALLOWED_MAPS.has(g.map)) g.map = 'world';
+      });
+    } else if (sanitized.geo.map && !ALLOWED_MAPS.has(sanitized.geo.map)) {
+      sanitized.geo.map = 'world';
+    }
+  }
 
-  const point = (i, v) => ({
-    x: pad + (i / Math.max(values.length - 1, 1)) * (w - 2 * pad),
-    y: pad + (1 - (v - minVal) / range) * (h - 2 * pad),
-  });
-
-  const linePath = values.map((v, i) => {
-    const p = point(i, v);
-    return `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`;
-  }).join(' ');
-
-  const lastP = point(values.length - 1, minVal);
-  const firstP = point(0, minVal);
-  const areaPath = linePath + ` L ${lastP.x} ${h - pad} L ${firstP.x} ${h - pad} Z`;
-
-  return (
-    <div className="my-4 rounded-xl border border-white/10 bg-[#1a1a1a] p-4">
-      {title && <p className="text-sm font-semibold text-white mb-2">{title}</p>}
-      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-44">
-        <defs>
-          <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#6366f1" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        {/* area */}
-        <path d={areaPath} fill="url(#lineGrad)" />
-        {/* line */}
-        <path d={linePath} fill="none" stroke="#6366f1" strokeWidth="2" />
-        {/* dots */}
-        {values.map((v, i) => {
-          const p = point(i, v);
-          return (
-            <g key={i}>
-              <circle cx={p.x} cy={p.y} r={hovered === i ? 5 : 3.5} fill="#818cf8"
-                className="transition-all duration-150"
-                style={{ strokeWidth: hovered === i ? 2 : 1, stroke: '#fff' }}
-                onMouseEnter={() => setHovered(i)}
-                onMouseLeave={() => setHovered(null)}
-              />
-              {hovered === i && (
-                <>
-                  <rect x={p.x - 22} y={p.y - 22} width={44} height={16} rx={4} fill="rgba(0,0,0,0.75)" />
-                  <text x={p.x} y={p.y - 10} textAnchor="middle" fill="white" fontSize="10">{v}</text>
-                </>
-              )}
-            </g>
-          );
-        })}
-        {/* X labels */}
-        {labels.map((l, i) => {
-          const p = point(i, values[i]);
-          return (
-            <text key={i} x={p.x} y={h - 5} textAnchor="middle" fill="#4b5563" fontSize="8">{String(l || '')}</text>
-          );
-        })}
-      </svg>
-    </div>
-  );
-};
-
-/* ─── Candlestick Chart ─── */
-const CandlestickChart = ({ data }) => {
-  const candles = (data.candles || []).map(c => ({
-    open: num(c.open), close: num(c.close), high: num(c.high), low: num(c.low)
-  }));
-  const title = data.title || '';
-  if (!candles.length) return null;
-
-  const w = 320;
-  const h = 160;
-  const pad = 20;
-
-  const allVals = candles.flatMap(c => [c.open, c.close, c.high, c.low]);
-  const maxVal = Math.max(...allVals);
-  const minVal = Math.min(...allVals);
-  const range = maxVal - minVal || 1;
-
-  const scaleY = (v) => pad + (1 - (v - minVal) / range) * (h - 2 * pad);
-  const bw = (w - 2 * pad) / candles.length;
-
-  return (
-    <div className="my-4 rounded-xl border border-white/10 bg-[#1a1a1a] p-4">
-      {title && <p className="text-sm font-semibold text-white mb-2">{title}</p>}
-      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-44">
-        {candles.map((c, i) => {
-          const x = pad + i * bw + bw / 2;
-          const bullish = c.close >= c.open;
-          const color = bullish ? '#10b981' : '#ef4444';
-          const bodyTop = scaleY(Math.max(c.open, c.close));
-          const bodyBot = scaleY(Math.min(c.open, c.close));
-          return (
-            <g key={i}>
-              <line x1={x} y1={scaleY(c.high)} x2={x} y2={scaleY(c.low)} stroke={color} strokeWidth="1" />
-              <rect x={x - bw * 0.3} y={bodyTop} width={bw * 0.6} height={Math.max(bodyBot - bodyTop, 1)}
-                fill={color} stroke={color} rx="0.5" />
-            </g>
-          );
-        })}
-      </svg>
-    </div>
-  );
-};
-
-/* ─── Scatter Chart ─── */
-const ScatterChart = ({ data }) => {
-  const [hovered, setHovered] = useState(null);
-  const points = (data.points || []).map(p => ({ x: num(p.x), y: num(p.y), label: p.label || '' }));
-  const title = data.title || '';
-  if (!points.length) return null;
-
-  const w = 300;
-  const h = 150;
-  const pad = 30;
-
-  const xs = points.map(p => p.x);
-  const ys = points.map(p => p.y);
-  const minX = Math.min(...xs), maxX = Math.max(...xs);
-  const minY = Math.min(...ys), maxY = Math.max(...ys);
-  const rangeX = maxX - minX || 1;
-  const rangeY = maxY - minY || 1;
-
-  const pos = (p) => ({
-    x: pad + ((p.x - minX) / rangeX) * (w - 2 * pad),
-    y: pad + (1 - (p.y - minY) / rangeY) * (h - 2 * pad),
-  });
-
-  return (
-    <div className="my-4 rounded-xl border border-white/10 bg-[#1a1a1a] p-4">
-      {title && <p className="text-sm font-semibold text-white mb-2">{title}</p>}
-      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-44">
-        {points.map((p, i) => {
-          const { x, y } = pos(p);
-          return (
-            <circle key={i} cx={x} cy={y} r={hovered === i ? 5 : 3.5}
-              fill={pick(i)} className="transition-all duration-150"
-              onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)}
-            >
-              {p.label && (
-                <title>{p.label}: ({p.x}, {p.y})</title>
-              )}
-            </circle>
-          );
-        })}
-      </svg>
-    </div>
-  );
-};
-
-/* ─── Main Chart Component ─── */
-const CHART_TYPES = {
-  bar: BarChart,
-  hbar: HBarChart,
-  'horizontal-bar': HBarChart,
-  pie: PieChart,
-  donut: DonutChart,
-  line: LineChart,
-  'line-chart': LineChart,
-  candlestick: CandlestickChart,
-  scatter: ScatterChart,
+  return sanitized;
 };
 
 const ChartView = ({ data }) => {
+  const [mapLoaded, setMapLoaded] = useState(worldMapRegistered);
+  const [error, setError] = useState(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [isDarkTheme, setIsDarkTheme] = useState(true);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef({ x: 0, y: 0 });
+  const chartRef = useRef(null);
+
+  useEffect(() => {
+    const optionStr = JSON.stringify(data);
+    const usesMap = optionStr.includes('"map"');
+
+    if (usesMap && !worldMapRegistered && !fetchingMap) {
+      fetchingMap = true;
+      fetch('https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json')
+        .then(res => res.json())
+        .then(geoJson => {
+          echarts.registerMap('world', geoJson);
+          worldMapRegistered = true;
+          setMapLoaded(true);
+        })
+        .catch(err => {
+          console.error('Failed to load map data:', err);
+          setError('Failed to load map data for rendering.');
+        })
+        .finally(() => { fetchingMap = false; });
+    } else if (usesMap && worldMapRegistered) {
+      setMapLoaded(true);
+    }
+  }, [data]);
+
   if (!data || typeof data !== 'object') {
-    return <div className="my-4 text-red-400 text-xs">Invalid chart data</div>;
+    return <div className="my-4 text-red-400 text-xs bg-red-500/10 p-4 rounded-xl">Invalid chart data</div>;
   }
-  const ChartComp = CHART_TYPES[data.type] || BarChart;
-  return <ChartComp data={data} />;
+
+  let processedData = data;
+  if (data.labels && data.values) {
+    const isPie = data.type === 'pie' || data.type === 'donut';
+    processedData = {
+      backgroundColor: 'transparent',
+      title: { text: data.title || '', textStyle: { color: isDarkTheme ? '#fff' : '#000' } },
+      tooltip: { trigger: isPie ? 'item' : 'axis' },
+      xAxis: isPie ? undefined : { type: 'category', data: data.labels },
+      yAxis: isPie ? undefined : { type: 'value' },
+      series: [
+        {
+          type: isPie ? 'pie' : data.type === 'line' ? 'line' : 'bar',
+          data: isPie ? data.values.map((v, i) => ({ value: v, name: data.labels[i] })) : data.values,
+          radius: data.type === 'donut' ? ['40%', '70%'] : isPie ? '50%' : undefined
+        }
+      ]
+    };
+  }
+
+  // ─── Sanitize option to strip unsupported features ───
+  const sanitizedData = sanitizeOption(processedData);
+
+  if (!sanitizedData) {
+    return (
+      <div className="my-4 rounded-lg border border-red-500/30 bg-red-500/10 overflow-hidden">
+        <div className="px-4 py-2 text-red-500 text-[11px] font-medium border-b border-red-500/20 flex items-center justify-between">
+          <span>⚠️ Unsupported Chart Type</span>
+          <span className="opacity-70">Click 'Regenerate' below to fix</span>
+        </div>
+        <pre className="p-4 text-gray-300 text-xs overflow-x-auto whitespace-pre-wrap max-h-40">{JSON.stringify(data, null, 2)}</pre>
+      </div>
+    );
+  }
+
+  // Deep clone to inject roam settings
+  const toggleRoam = (obj, enable) => {
+    if (!obj || typeof obj !== 'object') return obj;
+    if (Array.isArray(obj)) return obj.map(item => toggleRoam(item, enable));
+    const newObj = { ...obj };
+    if (newObj.type === 'map' || newObj.type === 'graph' || newObj.type === 'tree' || newObj.type === 'treemap') {
+      newObj.roam = enable;
+    }
+    for (const key in newObj) {
+      if (typeof newObj[key] === 'object') newObj[key] = toggleRoam(newObj[key], enable);
+    }
+    return newObj;
+  };
+
+  const enhancedOption = {
+    backgroundColor: 'transparent',
+    textStyle: { fontFamily: 'Inter, sans-serif' },
+    ...toggleRoam(sanitizedData, isFullscreen) // ONLY roam in fullscreen
+  };
+
+  const isMap = JSON.stringify(enhancedOption).includes('"map"');
+
+  // Extract title to render natively so it stays pinned during zoom
+  const fullscreenTitleText = Array.isArray(enhancedOption.title) 
+      ? enhancedOption.title[0]?.text 
+      : enhancedOption.title?.text || '';
+
+  const optionForFullscreen = { 
+    ...enhancedOption, 
+    backgroundColor: 'transparent',
+    title: undefined // Remove from ECharts so it doesn't duplicate and zoom
+  };
+
+  if (isMap && !mapLoaded && !error) {
+    return (
+      <div className="my-4 rounded-xl border border-white/10 bg-[#1a1a1a] p-8 flex items-center justify-center h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-6 h-6 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin"></div>
+          <span className="text-gray-400 text-sm">Loading map data...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) return <div className="my-4 text-red-400 text-xs bg-red-500/10 p-4 rounded-xl">{error}</div>;
+
+  const handleMouseDown = (e) => {
+    if (e.button !== 0) return;
+    setIsPanning(true);
+    panStartRef.current = { x: e.clientX - panOffset.x, y: e.clientY - panOffset.y };
+  };
+  const handleMouseMove = (e) => {
+    if (!isPanning) return;
+    setPanOffset({ x: e.clientX - panStartRef.current.x, y: e.clientY - panStartRef.current.y });
+  };
+  const handleMouseUp = () => setIsPanning(false);
+
+  // Validate basic structure
+  let isValid = true;
+  if (!enhancedOption.series && enhancedOption.dataset === undefined) isValid = false;
+  if (typeof enhancedOption.xAxis === 'string' || typeof enhancedOption.yAxis === 'string') isValid = false;
+
+  if (!isValid) {
+    return (
+      <div className="my-4 rounded-lg border border-red-500/30 bg-red-500/10 overflow-hidden relative group">
+        <div className="px-4 py-2 text-red-500 text-[11px] font-medium border-b border-red-500/20 flex items-center justify-between">
+          <span>⚠️ Invalid Chart Data Format</span>
+          <span className="opacity-70">Click 'Regenerate' below to fix</span>
+        </div>
+        <pre className="p-4 text-gray-300 text-xs overflow-x-auto whitespace-pre-wrap max-h-40">{JSON.stringify(data, null, 2)}</pre>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div 
+        className="relative group my-4 rounded-xl border border-white/10 overflow-hidden p-2 cursor-pointer transition-colors duration-300"
+        style={{ backgroundColor: isDarkTheme ? '#1a1a1a' : '#ffffff' }}
+        onClick={() => setIsFullscreen(true)}
+      >
+        <ChartErrorBoundary>
+          <div className="w-full h-full">
+            <ReactECharts
+              option={enhancedOption}
+              style={{ height: '400px', width: '100%' }}
+              theme={isDarkTheme ? 'dark' : 'light'}
+              opts={{ renderer: 'svg' }}
+              notMerge={true}
+              lazyUpdate={true}
+              onEvents={{ click: () => setIsFullscreen(true) }}
+            />
+          </div>
+        </ChartErrorBoundary>
+        <button 
+          onClick={(e) => { e.stopPropagation(); setIsFullscreen(true); }}
+          className="absolute top-4 right-4 p-1.5 bg-black/60 hover:bg-black/80 rounded-md text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity backdrop-blur-sm flex items-center gap-1 z-10"
+        >
+          <Maximize2 className="w-3.5 h-3.5" />
+          <span className="text-[10px] uppercase font-bold tracking-wider">Expand</span>
+        </button>
+      </div>
+
+      <AnimatePresence>
+        {isFullscreen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] bg-black/95 flex flex-col items-center justify-center p-1 sm:p-4 backdrop-blur-md"
+            onClick={() => setIsFullscreen(false)}
+          >
+            <button 
+               className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors z-[10000]"
+               onClick={() => setIsFullscreen(false)}
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            {/* Pinned Title Layer */}
+            {fullscreenTitleText && (
+              <div className={`absolute top-6 sm:top-8 left-6 sm:left-10 z-[10001] text-lg sm:text-3xl font-bold bg-[#1a1a1a]/40 backdrop-blur-md px-4 py-2 rounded-lg border border-white/10 shadow-lg ${isDarkTheme ? 'text-white' : 'text-gray-800'}`}>
+                {fullscreenTitleText}
+              </div>
+            )}
+
+            <div 
+              className={`w-full max-w-[100vw] sm:max-w-[95vw] h-[92vh] sm:h-[85vh] rounded-none sm:rounded-xl border-0 sm:border shadow-2xl relative transition-colors duration-300 ${isDarkTheme ? 'bg-[#1a1a1a] sm:border-white/10' : 'bg-white sm:border-gray-200'} ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+            >
+              <div 
+                className="transition-transform ease-out w-full h-full"
+                style={{ 
+                  transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`,
+                  transitionDuration: isPanning ? '0ms' : '200ms'
+                }}
+              >
+                <ChartErrorBoundary>
+                  <ReactECharts
+                    ref={chartRef}
+                    option={optionForFullscreen}
+                    style={{ height: '100%', width: '100%' }}
+                    theme={isDarkTheme ? 'dark' : 'light'}
+                    opts={{ renderer: 'svg' }}
+                    notMerge={true}
+                    lazyUpdate={true}
+                  />
+                </ChartErrorBoundary>
+              </div>
+            </div>
+
+            {/* Exactly the same Toolbar as MermaidDiagram */}
+            <div 
+              className="absolute bottom-3 sm:bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-0.5 sm:gap-1 bg-[#252525] border border-white/10 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full shadow-2xl z-[10000] max-w-[95vw] overflow-x-auto"
+              onClick={e => e.stopPropagation()}
+            >
+              <button 
+                onClick={() => setZoom(z => Math.max(0.25, z - 0.25))} 
+                className="p-1.5 sm:p-2 hover:bg-blue-500/20 hover:text-blue-400 rounded-full text-gray-300 transition-colors flex-shrink-0"
+              >
+                <ZoomOut className="w-3.5 sm:w-4 h-3.5 sm:h-4"/>
+              </button>
+              <span className="text-gray-200 text-[10px] sm:text-xs font-medium w-8 sm:w-10 text-center select-none flex-shrink-0">
+                {Math.round(zoom * 100)}%
+              </span>
+              <button 
+                onClick={() => setZoom(z => Math.min(4, z + 0.25))} 
+                className="p-1.5 sm:p-2 hover:bg-blue-500/20 hover:text-blue-400 rounded-full text-gray-300 transition-colors flex-shrink-0"
+              >
+                <ZoomIn className="w-3.5 sm:w-4 h-3.5 sm:h-4"/>
+              </button>
+              <div className="w-px h-4 sm:h-5 bg-white/10 mx-0.5 sm:mx-1 flex-shrink-0" />
+              <button 
+                onClick={() => { setZoom(1); setPanOffset({x:0, y:0}); }}
+                className="p-1.5 sm:p-2 hover:bg-emerald-500/20 hover:text-emerald-400 rounded-full text-gray-300 transition-colors flex-shrink-0"
+              >
+                <Maximize className="w-3.5 sm:w-4 h-3.5 sm:h-4"/>
+              </button>
+              <button 
+                onClick={() => setIsDarkTheme(d => !d)}
+                className="p-1.5 sm:p-2 hover:bg-amber-500/20 hover:text-amber-400 rounded-full text-gray-300 transition-colors flex-shrink-0"
+              >
+                {isDarkTheme ? <Sun className="w-3.5 sm:w-4 h-3.5 sm:h-4"/> : <Moon className="w-3.5 sm:w-4 h-3.5 sm:h-4"/>}
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
 };
 
-export { ChartView, BarChart, PieChart, DonutChart, LineChart, HBarChart, CandlestickChart, ScatterChart };
+export { ChartView };
 export default ChartView;

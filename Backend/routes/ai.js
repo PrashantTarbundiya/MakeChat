@@ -182,7 +182,14 @@ router.post('/chat', upload.array('files'), async (req, res) => {
     
     const messages = [{ role: 'system', content: systemPrompt }];
     
-    if (chatId) {
+    if (history) {
+      try {
+        const parsedHistory = JSON.parse(history);
+        parsedHistory.forEach(msg => {
+          messages.push({ role: msg.role, content: msg.content });
+        });
+      } catch (e) {}
+    } else if (chatId) {
       try {
         const Chat = (await import('../models/Chat.js')).default;
         const chat = await Chat.findById(chatId);
@@ -194,13 +201,6 @@ router.post('/chat', upload.array('files'), async (req, res) => {
       } catch (e) {
         console.error('Failed to load chat history:', e);
       }
-    } else if (history) {
-      try {
-        const parsedHistory = JSON.parse(history);
-        parsedHistory.forEach(msg => {
-          messages.push({ role: msg.role, content: msg.content });
-        });
-      } catch (e) {}
     }
     
     // Add user message with image if present

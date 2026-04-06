@@ -26,7 +26,7 @@ const parseChartJSON = (raw) => {
   return null;
 };
 
-const ChartBlockRenderer = ({ codeString }) => {
+const ChartBlockRenderer = ({ codeString, onSendMessage }) => {
   const [rawJson, setRawJson] = useState(codeString);
   const [editing, setEditing] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -72,14 +72,24 @@ const ChartBlockRenderer = ({ codeString }) => {
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] text-gray-500">The LLM returned malformed JSON. Fix it below:</p>
-                <button
-                  onClick={() => setEditing(true)}
-                  className="px-3 py-1 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 text-xs rounded-lg"
-                >
-                  ✏️ Fix JSON
-                </button>
+              <div className="flex flex-col gap-2">
+                <p className="text-[11px] text-gray-500">The AI generated malformed JSON (possibly JS functions that break the parser).</p>
+                <div className="flex gap-2 items-center">
+                  {onSendMessage && (
+                    <button
+                      onClick={() => onSendMessage("The chart JSON you just generated contained syntax errors or JavaScript functions which prevent JSON parsing. Please return ONLY the strictly valid JSON option object block for the chart. Do not include function() or any JS logic. Use only ECharts string template formatters. Output only the chart code block.")}
+                      className="px-3 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 text-xs font-semibold rounded-lg transition-colors border border-purple-500/30"
+                    >
+                      🪄 Auto-Fix via AI
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setEditing(true)}
+                    className="px-3 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 text-xs font-semibold rounded-lg transition-colors border border-yellow-500/30"
+                  >
+                    ✏️ Manual Fix
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -95,7 +105,7 @@ mermaid.initialize({
   securityLevel: 'loose',
 });
 
-const MermaidDiagram = ({ chart }) => {
+const MermaidDiagram = ({ chart, onSendMessage }) => {
   const [svg, setSvg] = useState('');
   const [error, setError] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -257,8 +267,20 @@ const MermaidDiagram = ({ chart }) => {
 
   if (error) {
     return (
-      <div className="my-4 rounded-lg border border-yellow-500/30 bg-yellow-500/10 overflow-hidden">
-        <div className="px-4 py-2 text-yellow-400 text-xs font-medium border-b border-yellow-500/20">⚠️ Could not render diagram — showing raw code</div>
+      <div className="my-4 rounded-lg border border-yellow-500/30 bg-yellow-500/10 overflow-hidden relative group">
+        <div className="px-4 py-2 text-yellow-500 text-[11px] font-medium border-b border-yellow-500/20 flex items-center justify-between">
+          <span>⚠️ Diagram Syntax Failed</span>
+          {onSendMessage ? (
+            <button 
+              onClick={() => onSendMessage("The Mermaid diagram you generated failed to render due to a syntax error. Please output ONLY the fully corrected mermaid diagram block with proper syntax. Use valid absolute dates for Gantts and valid node quotes.")}
+              className="px-2 py-1 bg-yellow-500/20 hover:bg-yellow-500/30 rounded border border-yellow-500/30 text-[10px] transition-colors"
+            >
+              🪄 Auto-Fix via AI
+            </button>
+          ) : (
+            <span className="opacity-70">Click 'Regenerate' below to fix</span>
+          )}
+        </div>
         <pre className="p-4 text-gray-300 text-xs overflow-x-auto whitespace-pre-wrap">{chart}</pre>
       </div>
     );
@@ -392,7 +414,7 @@ const MermaidDiagram = ({ chart }) => {
   );
 };
 
-export const MessageBubble = ({ content, role }) => {
+export const MessageBubble = ({ content, role, versions, currentVersion, onVersionChange, onSendMessage }) => {
   const [copiedCode, setCopiedCode] = useState(null);
   const [showThinking, setShowThinking] = useState(false);
   const mediaRef = useRef(null);
@@ -545,12 +567,12 @@ export const MessageBubble = ({ content, role }) => {
               const codeIndex = node?.position?.start?.line || 0;
 
               if (match && match[1].toLowerCase() === 'mermaid') {
-                return <MermaidDiagram chart={codeString} />;
+                return <MermaidDiagram chart={codeString} onSendMessage={onSendMessage} />;
               }
 
               // Render inline chart from ```chart blocks
               if (match && match[1].toLowerCase() === 'chart') {
-                return <ChartBlockRenderer codeString={codeString} />;
+                return <ChartBlockRenderer codeString={codeString} onSendMessage={onSendMessage} />;
               }
 
               return !inline && match ? (

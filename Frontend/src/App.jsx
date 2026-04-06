@@ -248,6 +248,7 @@ function App({ user, isShared = false }) {
       formData.append('message', message);
       formData.append('model', model);
       formData.append('userId', user?.id || 'guest');
+      formData.append('history', JSON.stringify(messages));
       if (requestChatId) formData.append('chatId', requestChatId);
       if (uploadedFileUrl) {
         formData.append('fileUrl', uploadedFileUrl);
@@ -438,6 +439,8 @@ function App({ user, isShared = false }) {
         formData.append('model', lastAssistantMsg.model || selectedModel);
         formData.append('userId', user?.id || 'guest');
         formData.append('mode', lastAssistantMsg.mode || 'normal');
+        formData.append('history', JSON.stringify(messages.slice(0, -2)));
+        if (requestChatId) formData.append('chatId', requestChatId);
         if (token) formData.append('token', token);
 
         const response = await fetch(`${import.meta.env.VITE_API_URL}/api/ai/chat`, {
@@ -897,6 +900,7 @@ function App({ user, isShared = false }) {
                           versions={msg.versions}
                           currentVersion={msg.currentVersion || 0}
                           onVersionChange={(v) => handleVersionChange(i, v)}
+                          onSendMessage={(text) => handleSendMessage(text, [], selectedModel)}
                         />
                       )}
                       {msg.thinking && msg.role === 'assistant' && editingIndex !== i && (
