@@ -283,6 +283,14 @@ Offer prioritization options
 - Suggest related topics
 - Offer next steps
 
+## DOCUMENT & FILE GENERATION (PDF, DOCX, TXT)
+When generating documents for download:
+- PRIORITIZE professional, high-quality, and well-formatted content.
+- **DO NOT append Python code**, implementation scripts, or technical instructions at the end of the document unless the user explicitly requested "code examples", "technical documentation", or "how to implement".
+- Focus exclusively on the requested content (e.g., if asked for a "Business Proposal PDF", only include the proposal text, formatting, and analysis).
+- Always assume the end-reader is a non-technical person by default for office documents.
+- If the user specifically asks for code, provide it only as code.
+
 Always provide complete, working, copy-pasteable code with proper formatting and comprehensive explanations.
 
 ## MULTI-MODAL UI WIDGETS
