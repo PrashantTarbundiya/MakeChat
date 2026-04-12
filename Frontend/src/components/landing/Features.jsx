@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, Brain, Zap, MessageCircle } from 'lucide-react';
+import { Sparkles, Brain, Zap, MessageCircle, Network, MapPin, FileText } from 'lucide-react';
 
 import { useMotionValue, useSpring, useTransform } from 'framer-motion';
 
@@ -134,6 +134,41 @@ export const Features = () => {
              delay={0.4}
              className="md:col-span-3"
            />
+        </div>
+
+        {/* Creative Studio Tools */}
+        <div className="mt-12">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.1 }}
+            className="flex items-center gap-4 mb-8"
+          >
+            <h4 className="text-xs font-bold tracking-[0.2em] text-emerald-400/80 uppercase">Creative Studio</h4>
+            <div className="h-px bg-gradient-to-r from-emerald-500/20 to-transparent flex-1" />
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <FeatureCard 
+              title="Diagram Generator"
+              description="Instantly visualize complex architectures, flowcharts, and system designs with Mermaid.js — right inside the chat."
+              icon={Network}
+              delay={0.5}
+            />
+            <FeatureCard 
+              title="Interactive Maps"
+              description="Generate live geographical visualizations. Plot locations, routes, and spatial data from a simple text prompt."
+              icon={MapPin}
+              delay={0.6}
+            />
+            <FeatureCard 
+              title="Document Generation"
+              description="Create and download production-ready files — PDFs, code, configs, and more — generated entirely by AI on demand."
+              icon={FileText}
+              delay={0.7}
+            />
+          </div>
         </div>
 
       </div>

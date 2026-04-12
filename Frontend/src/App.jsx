@@ -13,6 +13,7 @@ import { Spotlight } from "@/components/landing/Spotlight";
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { Code2, Palette, Lightbulb, FileText, Sparkles } from "lucide-react";
 
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -364,12 +365,12 @@ function App({ user, isShared = false }) {
       } else {
         console.error('Error:', error);
       }
-      } finally {
-        if (activeChatIdRef.current === requestChatId) {
-          setIsLoading(false);
-          setLoadingState('');
-          abortControllerRef.current = null;
-        }
+    } finally {
+      if (activeChatIdRef.current === requestChatId) {
+        setIsLoading(false);
+        setLoadingState('');
+        abortControllerRef.current = null;
+      }
       // Cleanup background tracking
       backgroundChatMessagesRef.current.delete(requestChatId);
       backgroundCurrentResponseRef.current.delete(requestChatId);
@@ -641,6 +642,13 @@ function App({ user, isShared = false }) {
       setSelectedModel(chatId);
       return;
     }
+
+    if (['mode-diagram', 'mode-map', 'mode-file'].includes(chatId)) {
+      setSidebarOpen(false);
+      const prefix = chatId === 'mode-diagram' ? '[Diagram: ' : chatId === 'mode-map' ? '[Map: ' : '[File:docx] ';
+      window.dispatchEvent(new CustomEvent('inject-prompt', { detail: prefix }));
+      return;
+    }
     setThinkingPanel(null);
     // Immediately set active chat ref to avoid race conditions with background generation
     activeChatIdRef.current = chatId;
@@ -669,7 +677,7 @@ function App({ user, isShared = false }) {
         setCurrentChatId(chatId);
         toast.remove();
         toast.success('Chat loaded successfully');
-        
+
         if (backgroundGenerations.has(chatId)) {
           setIsLoading(true);
           setLoadingState('✨ Generating response...');
@@ -696,41 +704,56 @@ function App({ user, isShared = false }) {
       const messagesToSave = currentResponse && isLoading
         ? [...messages, { role: 'assistant', content: currentResponse + ' [Incomplete]', model: selectedModel }]
         : messages;
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/chat/save`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          chatId: currentChatId,
-          messages: messagesToSave,
-          title: messages[0]?.content.slice(0, 50) || 'New Chat'
-        })
-      });
 
-      if (response.status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('cachedChats');
-        window.location.href = '/login';
-        return;
-      }
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
-      if (response.ok) {
-        const chat = await response.json();
-        if (!currentChatId) {
-          setCurrentChatId(chat._id);
-          activeChatIdRef.current = chat._id;
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/chat/save`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            chatId: currentChatId,
+            messages: messagesToSave,
+            title: messages[0]?.content.slice(0, 50) || 'New Chat'
+          }),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          localStorage.removeItem('cachedChats');
+          window.location.href = '/login';
+          return;
         }
-        // Update cache - move edited chat to top
-        const cachedChats = JSON.parse(localStorage.getItem('cachedChats') || '[]');
-        const filteredChats = cachedChats.filter(c => c._id !== chat._id);
-        const updatedCache = [{ ...chat, updatedAt: new Date().toISOString() }, ...filteredChats].slice(0, 4);
-        localStorage.setItem('cachedChats', JSON.stringify(updatedCache));
+
+        if (response.ok) {
+          const chat = await response.json();
+          if (!currentChatId) {
+            setCurrentChatId(chat._id);
+            activeChatIdRef.current = chat._id;
+          }
+          // Update cache - move edited chat to top
+          const cachedChats = JSON.parse(localStorage.getItem('cachedChats') || '[]');
+          const filteredChats = cachedChats.filter(c => c._id !== chat._id);
+          const updatedCache = [{ ...chat, updatedAt: new Date().toISOString() }, ...filteredChats].slice(0, 4);
+          localStorage.setItem('cachedChats', JSON.stringify(updatedCache));
+        }
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        if (fetchError.name === 'AbortError') {
+          console.warn('Chat save request timed out after 10 seconds');
+        } else {
+          console.error('Failed to save chat:', fetchError.message);
+        }
       }
     } catch (error) {
-      console.error('Failed to save chat:', error);
+      console.error('Unexpected error in saveChat:', error);
     }
   };
 
@@ -790,11 +813,49 @@ function App({ user, isShared = false }) {
     }
   }, [chatId, user, isShared]);
 
+  const handleShareCurrentChat = async () => {
+    if (!currentChatId || user?.id === 'guest') {
+      toast.error('You need an account to share chats');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/chat/${currentChatId}/share`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const shareUrl = `${window.location.origin}/share/${data.shareToken}`;
+        if (navigator.share) {
+          await navigator.share({ url: shareUrl, title: 'Check out this MakeChat conversation' });
+        } else {
+          navigator.clipboard.writeText(shareUrl);
+          toast.success('Share link copied to clipboard!');
+        }
+      } else {
+        toast.error('Failed to share chat');
+      }
+    } catch (error) {
+      console.error('Share failed:', error);
+      toast.error('Share failed');
+    }
+  };
+
   return (
     <div className="flex w-full h-screen bg-black overflow-hidden relative">
       <Spotlight />
       <Toaster position="top-center" toastOptions={{ style: { background: '#1F2023', color: '#fff' } }} />
-      <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+      <Header 
+        sidebarOpen={sidebarOpen} 
+        setSidebarOpen={setSidebarOpen} 
+        currentChatId={currentChatId}
+        onShare={handleShareCurrentChat}
+      />
       <Sidebar
         user={user}
         onLogout={handleLogout}
@@ -809,40 +870,59 @@ function App({ user, isShared = false }) {
       />
       <div className={`flex flex-col flex-1 transition-all duration-300 ${sidebarOpen ? 'lg:ml-64' : 'ml-0'} ${thinkingPanel !== null ? 'lg:mr-[300px]' : ''} h-screen`}>
         <div className="flex-1 overflow-y-auto p-2 sm:p-4 pt-[70px] md:pt-[80px] pb-[120px] md:pb-[140px] scrollbar-thin scrollbar-thumb-black scrollbar-track-black">
-          <div className="max-w-[900px] mx-auto space-y-4">
+          <div className={`mx-auto space-y-4 w-full transition-all duration-300 ${thinkingPanel !== null ? 'max-w-[700px]' : 'max-w-[800px]'}`}>
             {messages.length === 0 && !isLoading && (
-              <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
+              <div className="flex flex-col items-center justify-center min-h-[50vh] px-4 relative z-10 w-full">
+                {/* Background ambient glow - scaled down */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-emerald-500/10 rounded-full blur-[100px] pointer-events-none opacity-40" />
+                <div className="absolute top-1/3 left-1/3 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-indigo-500/10 rounded-full blur-[80px] pointer-events-none opacity-40" />
+
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5 }}
-                  className="text-center mb-8"
+                  transition={{ duration: 0.6, ease: [0.25, 0.4, 0.25, 1] }}
+                  className="text-center mb-8 relative"
                 >
-                  <h1 className="text-3xl sm:text-4xl font-bold text-white mb-3">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.2, duration: 0.5 }}
+                    className="inline-flex items-center justify-center p-1.5 bg-white/5 border border-white/10 rounded-xl mb-4 shadow-lg backdrop-blur-md"
+                  >
+                    <Sparkles className="w-5 h-5 text-emerald-400" />
+                  </motion.div>
+                  <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-white via-white to-white/40 tracking-tight mb-2 drop-shadow-sm pb-1">
                     {user?.name ? `Welcome back, ${user.name}` : 'Welcome to MakeChat'}
                   </h1>
-                  <p className="text-gray-400 text-lg">How can I help you today?</p>
+                  <p className="text-gray-400 text-base md:text-lg max-w-xl mx-auto font-medium">
+                    How can I help you today?
+                  </p>
                 </motion.div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-[600px]">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-[650px] relative">
                   {[
-                    { icon: '💻', title: 'Write code', desc: 'Create a Python script for data analysis' },
-                    { icon: '🎨', title: 'Design UI', desc: 'Generate a modern landing page design' },
-                    { icon: '🧠', title: 'Brainstorm', desc: 'Ideas for a new marketing campaign' },
-                    { icon: '📝', title: 'Summarize', desc: 'Condense a long article or document' }
+                    { icon: <Code2 className="w-5 h-5 text-emerald-400 group-hover:text-white transition-colors" />, bg: "from-emerald-500/20 to-transparent", title: 'Write code', desc: 'Create a Python script for data analysis' },
+                    { icon: <Palette className="w-5 h-5 text-purple-400 group-hover:text-white transition-colors" />, bg: "from-purple-500/20 to-transparent", title: 'Design UI', desc: 'Generate a modern landing page design' },
+                    { icon: <Lightbulb className="w-5 h-5 text-amber-400 group-hover:text-white transition-colors" />, bg: "from-amber-500/20 to-transparent", title: 'Brainstorm', desc: 'Ideas for a new marketing campaign' },
+                    { icon: <FileText className="w-5 h-5 text-blue-400 group-hover:text-white transition-colors" />, bg: "from-blue-500/20 to-transparent", title: 'Summarize', desc: 'Condense a long article or document' }
                   ].map((item, i) => (
                     <motion.button
                       key={i}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: i * 0.1, duration: 0.3 }}
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2 + i * 0.1, duration: 0.4, ease: "easeOut" }}
                       onClick={() => handleSendMessage(item.desc, [], selectedModel)}
-                      className="flex items-center gap-3 p-4 bg-[#1F2023] hover:bg-[#2A2B2E] border border-white/5 hover:border-emerald-500/30 rounded-xl transition-all text-left group"
+                      className="group relative flex flex-col items-start gap-3 p-4 bg-[#16171A]/80 hover:bg-[#1A1C20] border border-white/[0.05] hover:border-white/[0.15] rounded-2xl transition-all duration-300 text-left overflow-hidden shadow-md hover:shadow-xl hover:-translate-y-0.5"
                     >
-                      <span className="text-2xl group-hover:scale-110 transition-transform">{item.icon}</span>
+                      {/* Hover Gradient Background */}
+                      <div className={`absolute inset-0 bg-gradient-to-br ${item.bg} opacity-0 group-hover:opacity-10 transition-opacity duration-500 pointer-events-none`} />
+
+                      <div className="p-2.5 bg-white/[0.03] border border-white/[0.05] group-hover:bg-white/[0.08] group-hover:border-white/[0.1] rounded-lg transition-all duration-300">
+                        {item.icon}
+                      </div>
                       <div>
-                        <div className="text-white font-medium text-sm">{item.title}</div>
-                        <div className="text-gray-400 text-xs">{item.desc}</div>
+                        <div className="text-white font-medium text-sm mb-0.5 tracking-wide">{item.title}</div>
+                        <div className="text-gray-400 text-xs font-medium leading-relaxed">{item.desc}</div>
                       </div>
                     </motion.button>
                   ))}
@@ -942,7 +1022,7 @@ function App({ user, isShared = false }) {
                   <span>{loadingState.replace('...', '')}<span className="inline-block" style={{ animation: 'dots 1.5s infinite' }}></span></span>
                 </div>
                 {['bytez-image', 'bytez-video'].includes(selectedModel) && (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     className="w-[300px] h-[300px] sm:w-[400px] sm:h-[400px] bg-[#1F2023] rounded-2xl flex items-center justify-center border border-white/5 overflow-hidden relative shadow-lg"
@@ -965,9 +1045,9 @@ function App({ user, isShared = false }) {
                   {messages[messages.length - 1]?.mode === 'canvas' ? (
                     <MessageBubble content={currentResponse} role="assistant" />
                   ) : messages[messages.length - 1]?.mode === 'think' ? (
-                    <ThinkingView content={currentResponse} />
+                    <ThinkingView content={currentResponse} isLoading={true} />
                   ) : messages[messages.length - 1]?.mode === 'search' ? (
-                    <SearchView content={currentResponse} />
+                    <SearchView content={currentResponse} isLoading={true} />
                   ) : (
                     <MessageBubble content={currentResponse} role="assistant" />
                   )}

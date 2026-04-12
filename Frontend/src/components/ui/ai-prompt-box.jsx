@@ -425,6 +425,18 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
   }, [externalModel]);
 
   React.useEffect(() => {
+    const handleInject = (e) => {
+      setInput(e.detail);
+      if (promptBoxRef.current) {
+        const textarea = promptBoxRef.current.querySelector('textarea');
+        if (textarea) textarea.focus();
+      }
+    };
+    window.addEventListener('inject-prompt', handleInject);
+    return () => window.removeEventListener('inject-prompt', handleInject);
+  }, []);
+
+  React.useEffect(() => {
     const handleClickOutside = (e) => {
       if (showModelDropdown && !e.target.closest('.model-dropdown-container')) {
         setShowModelDropdown(false);
@@ -550,6 +562,7 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
       if (showSearch) messagePrefix = "[Search: ";
       else if (showThink) messagePrefix = "[Think: ";
       else if (showCanvas) messagePrefix = "[Canvas: ";
+
       const formattedInput = messagePrefix ? `${messagePrefix}${input}]` : input;
       onSend(formattedInput, files, selectedModel);
       setInput("");

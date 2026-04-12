@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Menu, X, Plus, MessageSquare, Settings, Trash2, Edit2, Share2, MoreVertical, Search, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ModelsModal } from './ModelsModal';
 
 export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId, backgroundGenerations, refreshTrigger, isOpen, setIsOpen, onOpenSettings }) => {
@@ -157,23 +158,23 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
         <div className="p-3 sm:p-4 border-b border-white/10 space-y-2">
           <button
             onClick={onNewChat}
-            className="w-full flex items-center gap-2 px-3 sm:px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors text-sm font-medium"
+            className="w-full flex items-center gap-2 px-3 sm:px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors text-sm font-medium group"
           >
-            <Plus className="w-4 sm:w-5 h-4 sm:h-5" />
+            <Plus className="w-4 sm:w-5 h-4 sm:h-5 transition-transform duration-300 group-hover:rotate-90" />
             New Chat
           </button>
           <button
             onClick={() => setSearchOpen(!searchOpen)}
-            className="w-full flex items-center gap-2 px-3 sm:px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-sm"
+            className="w-full flex items-center gap-2 px-3 sm:px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-sm group"
           >
-            <Search className="w-4 sm:w-5 h-4 sm:h-5" />
+            <Search className="w-4 sm:w-5 h-4 sm:h-5 transition-all duration-300 group-hover:-rotate-12 group-hover:scale-110" />
             Search
           </button>
           <button
             onClick={() => setModelsOpen(!modelsOpen)}
-            className="w-full flex items-center gap-2 px-3 sm:px-4 py-2 bg-white/5 hover:bg-white/10 hover:text-emerald-400 rounded-lg transition-colors text-sm"
+            className="w-full flex items-center gap-2 px-3 sm:px-4 py-2 bg-white/5 hover:bg-white/10 hover:text-emerald-400 rounded-lg transition-colors text-sm group"
           >
-            <Sparkles className="w-4 sm:w-5 h-4 sm:h-5" />
+            <Sparkles className="w-4 sm:w-5 h-4 sm:h-5 transition-all duration-300 group-hover:rotate-12 group-hover:scale-110 group-hover:text-emerald-400" />
             Models
           </button>
         </div>
@@ -307,55 +308,169 @@ export const Sidebar = ({ user, onLogout, onNewChat, onSelectChat, currentChatId
 
       <ModelsModal isOpen={modelsOpen} onClose={() => setModelsOpen(false)} onSelectModel={onSelectChat} />
 
-      {searchOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => setSearchOpen(false)}>
-          <div className="bg-[#1F2023] rounded-lg p-4 sm:p-6 w-full max-w-[600px] max-h-[85vh] mx-4 flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base sm:text-lg font-semibold text-white">Search Chats</h3>
-              <button onClick={() => setSearchOpen(false)} className="text-gray-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <input
-              autoFocus
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Type to search..."
-              className="w-full px-3 sm:px-4 py-2 bg-white/10 rounded-lg text-white placeholder-gray-400 outline-none mb-4 text-sm"
+      <AnimatePresence>
+        {searchOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6 overflow-hidden">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/70 backdrop-blur-md"
+              onClick={() => setSearchOpen(false)}
             />
-            <div className="flex-1 overflow-y-auto space-y-2 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
-              {chats.filter(chat => chat.title.toLowerCase().includes(searchQuery.toLowerCase())).map(chat => (
-                <button
-                  key={chat._id}
-                  onClick={() => { onSelectChat(chat._id); setSearchOpen(false); setSearchQuery(''); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-white/10 rounded-lg text-left transition-colors"
-                >
-                  <MessageSquare className="w-4 h-4 text-gray-400" />
-                  <span className="text-sm text-white truncate">{chat.title}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: "spring", duration: 0.5, bounce: 0.3 }}
+              className="bg-[#0f1014]/90 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 sm:p-8 w-full max-w-[850px] max-h-[85vh] mx-auto flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.5)] relative overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Top Gloss Highlight */}
+              <div className="absolute top-0 right-0 left-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
 
-      {deleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-          <div className="bg-[#2A2B2E] rounded-lg p-4 sm:p-6 max-w-sm mx-4">
-            <h3 className="text-base sm:text-lg font-semibold mb-2 text-white">Delete Chat?</h3>
-            <p className="text-gray-400 text-xs sm:text-sm mb-4">This action cannot be undone.</p>
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setDeleteConfirm(null)} className="px-3 sm:px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm text-white">
-                Cancel
-              </button>
-              <button onClick={() => deleteChat(deleteConfirm)} className="px-3 sm:px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg text-sm text-white">
-                Delete
-              </button>
-            </div>
+              {/* Header — matching ModelsModal style */}
+              <div className="flex items-center justify-between mb-8 relative z-10">
+                <div className="flex items-center gap-4">
+                  <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/5 shadow-inner">
+                    <Search className="w-6 h-6 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent tracking-tight">
+                      Search Chats
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1.5 font-medium">Browse your entire conversation archive</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSearchOpen(false)}
+                  className="p-2.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-all hover:rotate-90 duration-300"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Search input — neutral with emerald focus */}
+              <div className="relative mb-6">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                <input
+                  autoFocus
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Type to search conversations..."
+                  className="w-full pl-12 pr-4 py-4 bg-black/40 border border-white/10 focus:border-emerald-500/40 rounded-2xl text-white placeholder-gray-500 outline-none transition-all duration-300 focus:shadow-[0_0_20px_rgba(16,185,129,0.1)] text-base"
+                />
+              </div>
+
+              {/* Category label */}
+              <div className="flex items-center gap-4 mb-4">
+                <h4 className="text-xs font-bold tracking-[0.2em] text-gray-400 uppercase">
+                  {searchQuery ? 'Search Results' : 'Recent Conversations'}
+                </h4>
+                <div className="h-px bg-gradient-to-r from-white/[0.08] to-transparent flex-1" />
+                <span className="text-xs text-gray-500 font-medium">
+                  {chats.filter(chat => chat.title.toLowerCase().includes(searchQuery.toLowerCase())).length} chats
+                </span>
+              </div>
+
+              {/* Results — isolated bento cards in a grid */}
+              <div className="flex-1 overflow-y-auto pr-2 -mr-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent pb-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {chats.filter(chat => chat.title.toLowerCase().includes(searchQuery.toLowerCase())).map((chat, idx) => (
+                    <motion.button
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: Math.min(idx * 0.04, 0.4) }}
+                      whileHover={{ scale: 1.02, y: -2 }}
+                      whileTap={{ scale: 0.98 }}
+                      key={chat._id}
+                      onClick={() => { onSelectChat(chat._id); setSearchOpen(false); setSearchQuery(''); }}
+                      className="group relative flex items-start gap-4 p-5 bg-[#17181c] border border-white/[0.04] rounded-2xl text-left transition-all duration-300 overflow-hidden group-hover:shadow-[0_0_20px_rgba(16,185,129,0.12)] hover:border-emerald-500/30"
+                    >
+                      {/* Hover background glow */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+
+                      <div className="p-3 rounded-xl bg-black/40 border border-white/5 shadow-inner transition-colors duration-300 group-hover:bg-black/60 relative z-10">
+                        <MessageSquare className="w-5 h-5 text-gray-400 group-hover:text-emerald-400 transition-colors duration-300" />
+                      </div>
+
+                      <div className="relative z-10 pt-1 flex-1 min-w-0">
+                        <span className="block text-base tracking-wide text-gray-200 group-hover:text-white font-semibold transition-colors duration-300 truncate">
+                          {chat.title}
+                        </span>
+                        <span className="block text-[13px] text-gray-500 group-hover:text-gray-400 transition-colors leading-relaxed mt-1">
+                          {chat.updatedAt ? new Date(chat.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Chat'}
+                        </span>
+                      </div>
+                    </motion.button>
+                  ))}
+                </div>
+
+                {chats.filter(chat => chat.title.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && searchQuery && (
+                  <motion.div
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                    className="text-center py-12"
+                  >
+                    <div className="mx-auto w-14 h-14 rounded-2xl bg-[#17181c] border border-white/5 flex items-center justify-center mb-4">
+                      <Search className="w-7 h-7 text-gray-500" />
+                    </div>
+                    <p className="text-gray-300 font-semibold text-lg">No results found</p>
+                    <p className="text-sm text-gray-500 mt-2">Try different keywords to find your conversation</p>
+                  </motion.div>
+                )}
+              </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {deleteConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setDeleteConfirm(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative w-full max-w-sm bg-[#0f1115] border border-white/5 rounded-2xl p-6 shadow-2xl overflow-hidden"
+            >
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500/20 via-red-500/50 to-red-500/20" />
+
+              <div className="flex items-start gap-4 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center flex-shrink-0">
+                  <Trash2 className="w-5 h-5 text-red-500" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-1">Delete Chat</h3>
+                  <p className="text-sm text-gray-400">This action cannot be undone. This will permanently delete your conversation history.</p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-sm font-medium text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => deleteChat(deleteConfirm)}
+                  className="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-xl text-sm font-medium text-white shadow-lg shadow-red-500/20 transition-all hover:shadow-red-500/40"
+                >
+                  Delete Forever
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </>
   );
 };

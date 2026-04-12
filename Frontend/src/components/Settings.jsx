@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { X, LogOut, Trash2, BarChart3 } from 'lucide-react';
+import { X, LogOut, Trash2, BarChart3, Brain, Settings2, Plus } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const MODEL_LABELS = {
   'llama-maverick': { name: 'Llama Maverick', emoji: '🦙' },
@@ -24,6 +25,7 @@ export const Settings = ({ user, isOpen, setIsOpen, onLogout }) => {
   const [newMemory, setNewMemory] = useState('');
   const [usageStats, setUsageStats] = useState(null);
   const [activeTab, setActiveTab] = useState('memory');
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   useEffect(() => {
     if (isOpen && user?.id && user.id !== 'guest') {
@@ -135,7 +137,6 @@ export const Settings = ({ user, isOpen, setIsOpen, onLogout }) => {
   };
 
   const clearAllMemories = async () => {
-    if (!confirm('Delete all personalized memories?')) return;
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
@@ -155,6 +156,7 @@ export const Settings = ({ user, isOpen, setIsOpen, onLogout }) => {
 
       if (response.ok) {
         fetchSettings();
+        setShowClearConfirm(false);
       }
     } catch (error) {
       console.error('Failed to clear memories:', error);
@@ -177,12 +179,10 @@ export const Settings = ({ user, isOpen, setIsOpen, onLogout }) => {
 
   // Prepare sorted usage data including models with 0 usage
   const allModelsStats = { ...MODEL_LABELS };
-  // Initialize all with 0 count
   Object.keys(allModelsStats).forEach(modelId => {
     allModelsStats[modelId] = { count: 0, lastUsed: null, ...allModelsStats[modelId] };
   });
   
-  // Merge actual usage
   if (usageStats?.stats) {
     Object.entries(usageStats.stats).forEach(([modelId, data]) => {
       if (!allModelsStats[modelId]) {
@@ -195,133 +195,323 @@ export const Settings = ({ user, isOpen, setIsOpen, onLogout }) => {
 
   const sortedStats = Object.entries(allModelsStats)
     .sort(([, a], [, b]) => {
-      // Sort by count descending, then alphabetically by name
       if (b.count !== a.count) return b.count - a.count;
       return a.name.localeCompare(b.name);
     });
 
   const maxCount = sortedStats.length > 0 ? sortedStats[0][1].count : 0;
 
+  const tabs = [
+    { id: 'memory', label: 'Memory', icon: Brain },
+    { id: 'usage', label: 'Usage', icon: BarChart3 },
+  ];
+
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-[#2A2B2E] rounded-lg max-w-md w-full max-h-[85vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-700">
-          <h2 className="text-lg sm:text-xl font-semibold text-white">Settings</h2>
-          <button onClick={() => setIsOpen(false)} className="p-1 hover:bg-white/10 rounded">
-            <X className="w-5 h-5 text-white" />
-          </button>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex border-b border-gray-700">
-          <button
-            onClick={() => setActiveTab('memory')}
-            className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${activeTab === 'memory' ? 'text-emerald-400 border-b-2 border-emerald-400' : 'text-gray-400 hover:text-white'}`}
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6 overflow-hidden">
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/70 backdrop-blur-md"
+            onClick={() => setIsOpen(false)}
+          />
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ type: "spring", duration: 0.5, bounce: 0.3 }}
+            className="bg-[#0a0b0e] backdrop-blur-2xl border border-white/[0.08] rounded-3xl w-full max-w-[850px] max-h-[92vh] mx-auto flex flex-col shadow-[0_0_60px_rgba(0,0,0,0.7)] relative overflow-hidden" 
+            onClick={(e) => e.stopPropagation()}
           >
-            🧠 Memory
-          </button>
-          <button
-            onClick={() => setActiveTab('usage')}
-            className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${activeTab === 'usage' ? 'text-emerald-400 border-b-2 border-emerald-400' : 'text-gray-400 hover:text-white'}`}
-          >
-            <BarChart3 className="w-4 h-4" /> Usage
-          </button>
-        </div>
+            {/* Top Gloss Highlight */}
+            <div className="absolute top-0 right-0 left-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
 
-        <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">
-          {/* Memory Tab */}
-          {activeTab === 'memory' && (
-            <div>
-              <h3 className="text-white font-semibold mb-2 text-sm sm:text-base">Manage Personalized Memory</h3>
-              <p className="text-gray-400 text-xs sm:text-sm mb-3">Reference saved memories - AI will use this information to personalize responses</p>
-              <div className="space-y-2 mb-3 max-h-[30vh] overflow-y-auto">
-                {memories.map((mem, i) => (
-                  <div key={i} className="flex items-center justify-between bg-white/10 p-2 rounded text-white text-xs sm:text-sm">
-                    <span className="break-words flex-1 mr-2">{mem}</span>
-                    <button onClick={() => deleteMemory(i)} className="p-1 hover:bg-red-500/20 rounded text-red-400 flex-shrink-0">
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 sm:p-8 pb-4 relative z-10">
+              <div className="flex items-center gap-4">
+                <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/5 shadow-inner">
+                  <Settings2 className="w-6 h-6 text-emerald-400" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent tracking-tight">
+                    Settings
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1 font-medium">Manage your preferences</p>
+                </div>
               </div>
-              {memories.length > 0 && (
-                <button onClick={clearAllMemories} className="w-full mb-3 px-3 sm:px-4 py-2 bg-red-500/20 hover:bg-red-500/30 rounded text-red-400 text-xs sm:text-sm">
-                  Clear All Memories
-                </button>
-              )}
-              <div className="flex gap-2">
-                <input
-                  value={newMemory}
-                  onChange={(e) => setNewMemory(e.target.value)}
-                  placeholder="e.g., I'm a developer"
-                  className="flex-1 bg-white/10 px-2 sm:px-3 py-2 rounded text-white outline-none text-xs sm:text-sm"
-                  onKeyDown={(e) => e.key === 'Enter' && addMemory()}
-                />
-                <button onClick={addMemory} className="px-3 sm:px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded text-white text-xs sm:text-sm">
-                  Add
-                </button>
-              </div>
+              <button 
+                onClick={() => setIsOpen(false)} 
+                className="p-2.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-all hover:rotate-90 duration-300"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-          )}
 
-          {/* Usage Dashboard Tab */}
-          {activeTab === 'usage' && (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-white font-semibold text-sm sm:text-base">Usage Dashboard</h3>
-                <div className="text-right">
-                  <div className="text-emerald-400 text-lg font-bold">{usageStats?.totalMessages || 0}</div>
-                  <div className="text-gray-500 text-[10px] uppercase tracking-wider">Total Messages</div>
-                </div>
-              </div>
+            {/* Two-Column Layout — Left sticky, Right scrolls */}
+            <div className="flex-1 overflow-hidden flex flex-col md:flex-row gap-6 px-6 sm:px-8 pb-6 sm:pb-8">
 
-              {sortedStats.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="text-3xl mb-2">📊</div>
-                  <p className="text-gray-400 text-sm">No usage data yet</p>
-                  <p className="text-gray-500 text-xs mt-1">Start chatting to see your stats!</p>
+                {/* Left Column — Sticky sidebar */}
+                <div className="flex flex-col gap-4 md:w-[280px] md:flex-shrink-0">
+                  {/* Profile Card */}
+                  <div className="p-5 bg-[#111215] border border-white/[0.06] rounded-2xl flex items-center gap-4">
+                    {user.avatar ? (
+                      <img src={user.avatar} alt={user.name} className="w-12 h-12 rounded-xl object-cover border border-white/10" referrerPolicy="no-referrer" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500/30 to-teal-500/20 border border-emerald-500/20 flex items-center justify-center text-white font-bold text-lg">
+                        {user.name?.charAt(0)?.toUpperCase() || 'U'}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-semibold truncate">{user.name || 'User'}</p>
+                      <p className="text-gray-500 text-sm truncate">{user.email || ''}</p>
+                    </div>
+                  </div>
+
+                  {/* Tab Navigation */}
+                  <div className="flex flex-col gap-1.5">
+                    {tabs.map((tab) => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 text-left ${
+                          activeTab === tab.id 
+                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' 
+                            : 'bg-[#111215] text-gray-400 border border-white/[0.04] hover:bg-white/[0.05] hover:text-white'
+                        }`}
+                      >
+                        <tab.icon className="w-4 h-4" />
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Sign Out */}
+                  <motion.button 
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
+                    onClick={onLogout} 
+                    className="w-full flex items-center justify-center gap-2.5 p-3.5 bg-[#111215] border border-red-500/10 hover:border-red-500/30 rounded-2xl text-red-400/80 hover:text-red-400 text-sm font-medium transition-all duration-300 mt-auto"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Sign Out
+                  </motion.button>
                 </div>
-              ) : (
-                <div className="space-y-2.5 max-h-[40vh] overflow-y-auto pr-1">
-                  {sortedStats.map(([modelId, data], index) => {
-                    const label = MODEL_LABELS[modelId] || { name: modelId, emoji: '🤖' };
-                    // Avoid NaN if maxCount is 0
-                    const percentage = maxCount > 0 ? (data.count / maxCount) * 100 : 0;
-                    return (
-                      <div key={modelId} className="group">
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-sm flex-shrink-0">{label.emoji}</span>
-                            <span className="text-white text-xs sm:text-sm truncate">{label.name}</span>
+
+                {/* Right Column — Scrollable Content */}
+                <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent pr-1">
+                  {/* Memory Tab */}
+                  {activeTab === 'memory' && (
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                      <div className="flex items-center gap-4 mb-5">
+                        <h4 className="text-xs font-bold tracking-[0.2em] text-gray-400 uppercase">Personalized Memory</h4>
+                        <div className="h-px bg-gradient-to-r from-white/[0.08] to-transparent flex-1" />
+                        <span className="text-xs text-gray-500 font-medium">{memories.length} items</span>
+                      </div>
+
+                      <p className="text-gray-500 text-sm mb-5 leading-relaxed">AI uses saved memories to personalize responses for you.</p>
+                      
+                      {/* Add Memory — at top for quick access */}
+                      <div className="flex gap-3 mb-5">
+                        <input
+                          value={newMemory}
+                          onChange={(e) => setNewMemory(e.target.value)}
+                          placeholder="e.g., I'm a frontend developer"
+                          className="flex-1 bg-[#111215] border border-white/[0.06] focus:border-emerald-500/40 px-4 py-3.5 rounded-2xl text-white placeholder-gray-500 outline-none transition-all duration-300 focus:shadow-[0_0_20px_rgba(16,185,129,0.1)] text-sm"
+                          onKeyDown={(e) => e.key === 'Enter' && addMemory()}
+                        />
+                        <motion.button 
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={addMemory} 
+                          className="px-5 py-3.5 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/20 rounded-2xl text-emerald-400 text-sm font-medium transition-all duration-300 flex items-center gap-2"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add
+                        </motion.button>
+                      </div>
+
+                      {/* Memory Items */}
+                      <div className="space-y-2.5 mb-5">
+                        {memories.map((mem, i) => (
+                          <motion.div 
+                            key={i} 
+                            initial={{ opacity: 0, y: 5 }} 
+                            animate={{ opacity: 1, y: 0 }} 
+                            transition={{ delay: Math.min(i * 0.05, 0.3) }}
+                            className="group flex items-center justify-between p-4 bg-[#111215] border border-white/[0.06] rounded-2xl hover:border-white/[0.1] transition-all duration-300"
+                          >
+                            <span className="text-gray-300 text-sm break-words flex-1 mr-3">{mem}</span>
+                            <button 
+                              onClick={() => deleteMemory(i)} 
+                              className="p-2 rounded-lg hover:bg-red-500/15 text-gray-500 hover:text-red-400 transition-all flex-shrink-0 opacity-0 group-hover:opacity-100"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </motion.div>
+                        ))}
+                        {memories.length === 0 && (
+                          <div className="text-center py-8">
+                            <div className="mx-auto w-14 h-14 rounded-2xl bg-[#111215] border border-white/5 flex items-center justify-center mb-4">
+                              <Brain className="w-7 h-7 text-gray-500" />
+                            </div>
+                            <p className="text-gray-400 font-medium">No memories saved</p>
+                            <p className="text-sm text-gray-500 mt-1">Add one above to personalize AI</p>
                           </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="text-gray-500 text-[10px]">{getTimeAgo(data.lastUsed)}</span>
-                            <span className="text-white text-xs font-semibold bg-white/10 px-1.5 py-0.5 rounded">{data.count}</span>
+                        )}
+                      </div>
+
+                      {memories.length > 0 && (
+                        <div className="mt-12 mb-4">
+                          <div className="relative group/danger">
+                            <div className="absolute inset-x-0 inset-y-2 bg-red-500/5 blur-2xl rounded-full transition-opacity opacity-50 group-hover/danger:opacity-100" />
+                            <div className="relative flex flex-col sm:flex-row sm:items-center justify-between p-5 bg-[#0a0a0c] border border-red-500/20 rounded-2xl transition-all duration-300 hover:border-red-500/40">
+                              <div className="pr-4 mb-4 sm:mb-0">
+                                <h4 className="text-sm font-semibold text-red-500 flex items-center gap-2 mb-1.5">
+                                  <Trash2 className="w-4 h-4" /> Danger Zone
+                                </h4>
+                                <p className="text-xs text-red-400/70 leading-relaxed">
+                                  Permanently erase all personalized memories. This AI will completely forget everything it learned about you.
+                                </p>
+                              </div>
+                              <button 
+                                onClick={() => setShowClearConfirm(true)} 
+                                className="w-full sm:w-auto px-5 py-2.5 bg-red-500 hover:bg-red-600 rounded-xl text-white text-sm font-semibold transition-all shadow-[0_0_15px_rgba(239,68,68,0.15)] hover:shadow-[0_0_25px_rgba(239,68,68,0.3)] flex-shrink-0"
+                              >
+                                Clear History
+                              </button>
+                            </div>
                           </div>
                         </div>
-                        <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-700 ease-out"
-                            style={{
-                              width: `${percentage}%`,
-                              background: `linear-gradient(90deg, ${index === 0 ? '#10b981' : index === 1 ? '#3b82f6' : index === 2 ? '#8b5cf6' : '#6b7280'}, ${index === 0 ? '#34d399' : index === 1 ? '#60a5fa' : index === 2 ? '#a78bfa' : '#9ca3af'})`
-                            }}
-                          />
+                      )}
+                    </motion.div>
+                  )}
+
+                  {/* Usage Tab */}
+                  {activeTab === 'usage' && (
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                      {/* Stats header */}
+                      <div className="flex items-center justify-between mb-5">
+                        <div className="flex items-center gap-4">
+                          <h4 className="text-xs font-bold tracking-[0.2em] text-gray-400 uppercase">Model Usage</h4>
+                          <div className="h-px bg-gradient-to-r from-white/[0.08] to-transparent flex-1" />
+                        </div>
+                        <div className="px-4 py-2 bg-[#111215] border border-white/[0.06] rounded-xl">
+                          <span className="text-emerald-400 text-lg font-bold">{usageStats?.totalMessages || 0}</span>
+                          <span className="text-gray-500 text-xs ml-2">total</span>
                         </div>
                       </div>
-                    );
-                  })}
+
+                      {sortedStats.length === 0 ? (
+                        <div className="text-center py-12">
+                          <div className="mx-auto w-14 h-14 rounded-2xl bg-[#111215] border border-white/5 flex items-center justify-center mb-4">
+                            <BarChart3 className="w-7 h-7 text-gray-500" />
+                          </div>
+                          <p className="text-gray-300 font-semibold text-lg">No usage data yet</p>
+                          <p className="text-sm text-gray-500 mt-2">Start chatting to see your stats!</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {sortedStats.map(([modelId, data], index) => {
+                            const label = MODEL_LABELS[modelId] || { name: modelId, emoji: '🤖' };
+                            const percentage = maxCount > 0 ? (data.count / maxCount) * 100 : 0;
+                            const barColors = [
+                              'from-emerald-500 to-emerald-400',
+                              'from-teal-500 to-teal-400',
+                              'from-cyan-500 to-cyan-400',
+                              'from-gray-500 to-gray-400'
+                            ];
+                            const barColor = barColors[Math.min(index, barColors.length - 1)];
+                            
+                            return (
+                              <motion.div 
+                                key={modelId} 
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: Math.min(index * 0.03, 0.4) }}
+                                className="group p-4 bg-[#111215] border border-white/[0.06] rounded-2xl hover:border-white/[0.1] transition-all duration-300"
+                              >
+                                <div className="flex items-center justify-between mb-2.5">
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <span className="text-base flex-shrink-0">{label.emoji}</span>
+                                    <span className="text-gray-200 text-sm font-medium truncate">{label.name}</span>
+                                  </div>
+                                  <div className="flex items-center gap-3 flex-shrink-0">
+                                    <span className="text-gray-500 text-xs">{getTimeAgo(data.lastUsed)}</span>
+                                    <span className="text-white text-xs font-bold bg-white/[0.06] px-2.5 py-1 rounded-lg">{data.count}</span>
+                                  </div>
+                                </div>
+                                <div className="h-1.5 bg-white/[0.03] rounded-full overflow-hidden">
+                                  <motion.div
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${percentage}%` }}
+                                    transition={{ duration: 0.8, delay: Math.min(index * 0.05, 0.5), ease: "easeOut" }}
+                                    className={`h-full rounded-full bg-gradient-to-r ${barColor}`}
+                                  />
+                                </div>
+                              </motion.div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
                 </div>
-              )}
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Clear Memories Confirmation Modal */}
+        <AnimatePresence>
+          {showClearConfirm && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+              <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }} 
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                onClick={() => setShowClearConfirm(false)}
+              />
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                className="relative w-full max-w-sm bg-[#0f1115] border border-white/5 rounded-2xl p-6 shadow-2xl overflow-hidden"
+              >
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500/20 via-red-500/50 to-red-500/20" />
+                
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center flex-shrink-0">
+                    <Trash2 className="w-5 h-5 text-red-500" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white mb-1">Clear All?</h3>
+                    <p className="text-sm text-gray-400">MakeChat will forget all personalized information learned from your conversations.</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 justify-end">
+                  <button 
+                    onClick={() => setShowClearConfirm(false)} 
+                    className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-sm font-medium text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={clearAllMemories} 
+                    className="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-xl text-sm font-medium text-white shadow-lg shadow-red-500/20 transition-all hover:shadow-red-500/40"
+                  >
+                    Clear History
+                  </button>
+                </div>
+              </motion.div>
             </div>
           )}
-
-          <button onClick={onLogout} className="w-full flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-red-500 hover:bg-red-600 rounded text-white text-sm">
-            <LogOut className="w-4 h-4" />
-            Logout
-          </button>
-        </div>
-      </div>
-    </div>
+        </AnimatePresence>
+        </>
+      )}
+    </AnimatePresence>
   );
 };

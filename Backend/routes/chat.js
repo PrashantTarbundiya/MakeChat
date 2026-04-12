@@ -136,15 +136,35 @@ router.delete('/:chatId', authenticate, async (req, res) => {
       // Extract and delete files from message content
       if (chat.messages) {
         for (const msg of chat.messages) {
-          const imgMatch = msg.content.match(/!\[.*?\]\((https:\/\/res\.cloudinary\.com\/[^)]+)\)/);
-          if (imgMatch) {
-            const publicId = imgMatch[1].split('/').slice(-2).join('/').split('.')[0];
-            try {
-              await deleteFromCloudinary(publicId);
-            } catch (e) {
-              console.error('Failed to delete image:', e);
+            // Check for image markdown specifically
+            const imgMatch = msg.content.match(/!\[.*?\]\((https:\/\/res\.cloudinary\.com\/[^)]+)\)/);
+            if (imgMatch) {
+              const publicId = imgMatch[1].split('/').slice(-2).join('/').split('.')[0];
+              try {
+                await deleteFromCloudinary(publicId, 'image');
+              } catch (e) {
+                console.error('Failed to delete image:', e);
+              }
             }
-          }
+            
+            // Check for generated document downloads
+            const jsonRegex = /\[FILE_DOWNLOAD:\s*(\{.*?\})\s*\]/g;
+            let fileMatch;
+            while ((fileMatch = jsonRegex.exec(msg.content)) !== null) {
+              try {
+                const parsed = JSON.parse(fileMatch[1]);
+                if (parsed.url && parsed.url.includes('res.cloudinary.com')) {
+                  const urlParts = parsed.url.split('/upload/');
+                  if (urlParts.length > 1) {
+                    const postVersion = urlParts[1];
+                    const publicId = postVersion.split('/').slice(1).join('/');
+                    await deleteFromCloudinary(publicId, 'raw');
+                  }
+                }
+              } catch (e) {
+                console.error('Failed to parse or delete generated file:', e);
+              }
+            }
         }
       }
     }

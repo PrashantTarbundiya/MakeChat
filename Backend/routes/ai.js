@@ -9,6 +9,7 @@ import dotenv from 'dotenv';
 import { SYSTEM_PROMPT } from '../config/systemPrompt.js';
 import { performWebSearch } from '../utils/webSearch.js';
 import { uploadToCloudinary } from '../utils/uploadToCloudinary.js';
+import { generateFileBuffer } from '../utils/fileGenerator.js';
 
 const require = createRequire(import.meta.url);
 const pdfParse = require('pdf-parse');
@@ -39,24 +40,24 @@ const MODELS = {
   'bytez-music': 'facebook/musicgen-stereo-small'
 };
 
-const COUNCIL_MODELS = ['grok-fast', 'gemini-pro','gpt-oss','kimi'];
+const COUNCIL_MODELS = ['grok-fast', 'gemini-pro', 'gpt-oss', 'kimi'];
 const CHAIRMAN_MODEL = 'deepseek/deepseek-v3.2';
 
 router.post('/chat', upload.array('files'), async (req, res) => {
   try {
     const { message, model = 'llama-maverick', history, chatId, userId } = req.body;
     const files = req.files;
-    
+
     // Process uploaded files
     let imageData = null;
     let documentText = '';
     let uploadedFileUrl = null;
     let uploadedFilePublicId = null;
-    
+
     if (files && files.length > 0) {
       const file = files[0];
       // console.log(`[File Upload] Received: ${file.originalname}, type: ${file.mimetype}, size: ${(file.size / 1024).toFixed(1)}KB`);
-      
+
       // Upload to Cloudinary first
       try {
         const cloudinaryResult = await uploadToCloudinary(file.buffer);
@@ -80,13 +81,13 @@ router.post('/chat', upload.array('files'), async (req, res) => {
           const text = pdfData?.text?.trim() || '';
           const pageCount = pdfData?.numpages || 'unknown';
           // console.log(`[PDF Parse] Success — Pages: ${pageCount}, Characters: ${text.length}`);
-          
+
           if (text.length > 0) {
             // Truncate very large PDFs to avoid token limits
             const maxChars = 50000;
             const truncated = text.length > maxChars;
             const content = truncated ? text.slice(0, maxChars) : text;
-            
+
             documentText = `\n\n=== PDF DOCUMENT ===\nFilename: ${file.originalname}\nPages: ${pageCount}\nCharacters: ${text.length}${truncated ? ` (showing first ${maxChars})` : ''}\n\n--- CONTENT START ---\n${content}\n--- CONTENT END ---${truncated ? '\n[Note: Document was truncated due to length. Ask user if they need content from later pages.]' : ''}`;
           } else {
             // console.log('[PDF Parse] No text extracted — PDF may be image-based or scanned');
@@ -121,15 +122,15 @@ router.post('/chat', upload.array('files'), async (req, res) => {
 
     // Detect mode and perform actions
     let userMessage = message + documentText;
-    
+
     if (message.startsWith('[Search:')) {
       const query = message.replace(/^\[Search:\s*/, '').replace(/\]$/, '');
       try {
         const searchResults = await performWebSearch(query);
-        
+
         if (searchResults) {
           const searchContext = `\n\nWeb Search Results for "${query}":\n` +
-            searchResults.map((r, i) => 
+            searchResults.map((r, i) =>
               `${i + 1}. ${r.title}\n   ${r.snippet}\n   Source: ${r.url}\n`
             ).join('\n');
           userMessage = message + searchContext;
@@ -138,15 +139,15 @@ router.post('/chat', upload.array('files'), async (req, res) => {
         console.error('Search failed:', e);
       }
     }
-    
+
     if (message.startsWith('[Think:')) {
       const query = message.replace(/^\[Think:\s*/, '').replace(/\]$/, '');
       try {
         const searchResults = await performWebSearch(query);
-        
+
         if (searchResults) {
           const researchContext = `\n\nResearch Data for "${query}":\n` +
-            searchResults.map((r, i) => 
+            searchResults.map((r, i) =>
               `Source ${i + 1}: ${r.title}\n${r.snippet}\nURL: ${r.url}\n`
             ).join('\n') +
             '\n\nAnalyze this data deeply with step-by-step reasoning.';
@@ -156,14 +157,79 @@ router.post('/chat', upload.array('files'), async (req, res) => {
         console.error('Think search failed:', e);
       }
     }
-    
+
     if (message.startsWith('[Canvas:')) {
       userMessage = message + '\n\nProvide complete standalone HTML with all CSS/JS inline. User will see the rendered output, not code.';
     }
 
+    if (message.startsWith('[Diagram:')) {
+      userMessage = message + '\n\nCRITICAL INSTRUCTION: Analyze the request and ONLY output a valid mermaid.js diagram enclosed in a ```mermaid code block. Do NOT provide any conversational text, explanations, or wrapper HTML.';
+    }
+
+    if (message.startsWith('[Map:')) {
+      userMessage = message + '\n\nCRITICAL INSTRUCTION: Analyze the request and ONLY output a valid Map configuration JSON wrapped in a ```json mapConfig code block. Include center coordinates, zoom, and points of interest markers. Do NOT provide any other text.';
+    }
+
+    // Detect file generation request — comprehensive multi-pattern detection
+    const FILE_TYPES_PATTERN = '(pdf|docx|txt|csv|tsv|json|xml|yaml|yml|md|markdown|sql|jsonl|ndjson|toml|ini|properties|svg|html|html5|xhtml|astro|jsx|tsx|py|python|js|javascript|ts|typescript|cpp|java|cs|csharp|go|golang|rust|shell|bash|sh|ruby|php|dockerfile|makefile|gradle|maven|pom|dart|kotlin|swift|groovy|latex|tex|r|matlab|css|scss|less|gql|graphql|env|gitignore)';
+    const lowerMessage = message.toLowerCase();
+
+    let fileGenMatch = null;
+    // Skip fuzzy detection for question-like messages (only allow explicit patterns)
+    const isQuestion = /^(what|how|why|when|where|who|is|are|does|do|can|could|explain|tell me about|describe|compare)\b/i.test(message.trim());
+
+    // Pattern 1: Explicit [File:xxx] prefix — always checked
+    fileGenMatch = fileGenMatch || message.match(/^\[File:([\w.]+)\]/i);
+    // Pattern 2: "verb ... filetype" — provide pdf, generate a pdf, give me pdf, etc.
+    fileGenMatch = fileGenMatch || message.match(new RegExp(`(?:provide|give|create|generate|make|return|output|save|export|send|write|build|prepare|compile|produce|render|convert|download|get).*?\\b${FILE_TYPES_PATTERN}\\b`, 'i'));
+    // Patterns 3-8: Fuzzy detection — skip for question-like messages to avoid false positives
+    if (!fileGenMatch && !isQuestion) {
+      // Pattern 3: "i need/want pdf" / "i need a pdf" / "i need pdf here"
+      fileGenMatch = fileGenMatch || message.match(new RegExp(`(?:i\\s+(?:need|want|require)(?:\\s+(?:a|an|the|this|that))?\\s+)${FILE_TYPES_PATTERN}\\b`, 'i'));
+      // Pattern 4: "filetype for ..." / "pdf for hello world"
+      fileGenMatch = fileGenMatch || message.match(new RegExp(`^\\s*${FILE_TYPES_PATTERN}\\s+(?:for|of|about|on|regarding|containing|with)\\b`, 'i'));
+      // Pattern 5: "as pdf" / "in pdf" / "to pdf" / "into pdf" / "as a pdf"
+      fileGenMatch = fileGenMatch || message.match(new RegExp(`(?:as|in|to|into)\\s+(?:a\\s+)?${FILE_TYPES_PATTERN}(?:\\s+(?:file|format|document))?\\b`, 'i'));
+      // Pattern 6: "pdf please" / "pdf file" / "pdf document"
+      fileGenMatch = fileGenMatch || message.match(new RegExp(`\\b${FILE_TYPES_PATTERN}\\s+(?:please|file|document|format|download|here)\\b`, 'i'));
+      // Pattern 7: "download link" / "download it" / "download here" (infer pdf from context)
+      if (!fileGenMatch && /\b(download|file)\b.*\b(link|it|here|this|button|now)\b/i.test(message)) {
+        const typeInMsg = message.match(new RegExp(`\\b${FILE_TYPES_PATTERN}\\b`, 'i'));
+        if (typeInMsg) {
+          fileGenMatch = typeInMsg;
+        } else if (history || chatId) {
+          fileGenMatch = ['download pdf', 'pdf'];
+        }
+      }
+      // Pattern 8: Standalone filetype word (e.g. just "pdf") when there's prior conversation
+      if (!fileGenMatch && (history || chatId)) {
+        const standaloneMatch = lowerMessage.trim().match(new RegExp(`^\\s*(?:(?:a|the|one|this)\\s+)?${FILE_TYPES_PATTERN}\\s*[.!?]*\\s*$`, 'i'));
+        if (standaloneMatch) fileGenMatch = standaloneMatch;
+      }
+    }
+
+    const isFileGeneration = fileGenMatch !== null;
+    const detectedFileType = fileGenMatch ? (fileGenMatch[1] || 'pdf').toLowerCase() : null;
+
     // Build messages array with history from DB or request
     let systemPrompt = SYSTEM_PROMPT;
-    
+    if (isFileGeneration) {
+      const ft = detectedFileType.toUpperCase();
+      const hasHistory = !!(history || chatId);
+      systemPrompt += `\n\nCRITICAL PRIORITY — FILE GENERATION MODE:
+You MUST generate a downloadable ${ft} file for the user.
+The backend will AUTOMATICALLY convert your text output into a real binary ${ft} file and give the user a download link. This is seamless and invisible to them.
+
+RULES:
+1. You must NEVER say "I cannot generate files" or "I'm a text-based AI". You CAN and WILL generate the file.
+2. You must NEVER suggest the user use Google Docs, Microsoft Word, or any external tool. The file is generated HERE.
+3. You must NOT wrap your response in a markdown code block (e.g. \`\`\`markdown). Output the formatted document text DIRECTLY.
+4. ${hasHistory ? 'If the user is referring to content from earlier in this conversation, use that content as the basis for the file. Re-generate and include that earlier content in your response — do NOT just reference it.' : 'Generate the complete document content as requested.'}
+5. Write high-quality, complete document content. Include proper headings, formatting, and structure.
+6. For PDF/DOCX: Use markdown formatting (headings, bold, lists, code blocks) — the system will render it beautifully.
+7. For code files: Output ONLY the raw code, no explanations around it.`;
+    }
+
     // Add user memory to system prompt
     if (userId && userId !== 'guest') {
       try {
@@ -179,16 +245,16 @@ router.post('/chat', upload.array('files'), async (req, res) => {
         console.error('Failed to load user memory:', e);
       }
     }
-    
+
     const messages = [{ role: 'system', content: systemPrompt }];
-    
+
     if (history) {
       try {
         const parsedHistory = JSON.parse(history);
         parsedHistory.forEach(msg => {
           messages.push({ role: msg.role, content: msg.content });
         });
-      } catch (e) {}
+      } catch (e) { }
     } else if (chatId) {
       try {
         const Chat = (await import('../models/Chat.js')).default;
@@ -202,11 +268,11 @@ router.post('/chat', upload.array('files'), async (req, res) => {
         console.error('Failed to load chat history:', e);
       }
     }
-    
+
     // Add user message with image if present
     if (imageData) {
-      messages.push({ 
-        role: 'user', 
+      messages.push({
+        role: 'user',
         content: [
           { type: 'text', text: userMessage },
           imageData
@@ -223,15 +289,15 @@ router.post('/chat', upload.array('files'), async (req, res) => {
       res.write(`data: ${JSON.stringify({ content: '### 🏛️ LLM Council - Stage 1: Initial Opinions\n\n' })}
 
 `);
-      
+
       const councilResponses = [];
-      
+
       // Stage 1: Get initial responses from all council members
       for (const councilModel of COUNCIL_MODELS) {
         res.write(`data: ${JSON.stringify({ content: `**${councilModel.toUpperCase()}** is thinking...\n` })}
 
 `);
-        
+
         let response = '';
         if (councilModel === 'gemini-pro') {
           const result = await genAI.models.generateContent({
@@ -257,31 +323,31 @@ router.post('/chat', upload.array('files'), async (req, res) => {
           });
           response = completion.choices[0]?.message?.content || '';
         }
-        
+
         councilResponses.push({ model: councilModel, response });
         res.write(`data: ${JSON.stringify({ content: `✓ ${councilModel.toUpperCase()} responded\n` })}
 
 `);
       }
-      
+
       // Stage 2: Debate - Each model reviews all other responses and provides critique
       res.write(`data: ${JSON.stringify({ content: '\n### 💬 Stage 2: Council Debate\n\n' })}
 
 `);
-      
+
       const debates = [];
       for (let i = 0; i < councilResponses.length; i++) {
         const debater = councilResponses[i];
         const allResponses = councilResponses
           .map((r, idx) => `**${r.model.toUpperCase()}:**\n${r.response}`)
           .join('\n\n---\n\n');
-        
+
         const debatePrompt = `You are ${debater.model.toUpperCase()} in an LLM Council debate.\n\nOriginal question: "${userMessage}"\n\nHere are all council members' responses:\n\n${allResponses}\n\nNow provide your analysis: What are the strengths and weaknesses of each response? What insights are missing? Keep it concise (2-3 sentences per response).`;
-        
+
         res.write(`data: ${JSON.stringify({ content: `**${debater.model.toUpperCase()}** is analyzing...\n` })}
 
 `);
-        
+
         let debate = '';
         if (debater.model === 'gemini-pro') {
           const result = await genAI.models.generateContent({ model: 'gemini-2.5-flash', contents: [{ role: 'user', parts: [{ text: debatePrompt }] }] });
@@ -303,29 +369,29 @@ router.post('/chat', upload.array('files'), async (req, res) => {
           });
           debate = completion.choices[0]?.message?.content || '';
         }
-        
+
         debates.push({ model: debater.model, debate });
         res.write(`data: ${JSON.stringify({ content: `✓ ${debater.model.toUpperCase()} analyzed\n` })}
 
 `);
       }
-      
+
       // Stage 3: Chairman synthesizes everything
       res.write(`data: ${JSON.stringify({ content: '\n### 👔 Stage 3: Chairman\'s Synthesis\n\n' })}
 
 `);
-      
+
       const allResponses = councilResponses.map((r, i) => `**${r.model.toUpperCase()}:**\n${r.response}`).join('\n\n---\n\n');
       const allDebates = debates.map((d, i) => `**${d.model.toUpperCase()}\'s Analysis:**\n${d.debate}`).join('\n\n---\n\n');
-      
+
       const chairmanPrompt = `You are the Chairman of an LLM Council. The user asked: "${userMessage}"\n\n## Initial Responses:\n${allResponses}\n\n## Council Debate & Analysis:\n${allDebates}\n\nBased on all responses and the debate analysis, provide a comprehensive final answer that:\n1. Synthesizes the best insights from all members\n2. Addresses weaknesses identified in the debate\n3. Provides a complete, accurate answer to the user's question`;
-      
+
       const chairmanResp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: CHAIRMAN_MODEL, messages: [{ role: 'user', content: chairmanPrompt }], stream: true })
       });
-      
+
       const reader = chairmanResp.body.getReader();
       const decoder = new TextDecoder();
       while (true) {
@@ -346,18 +412,14 @@ router.post('/chat', upload.array('files'), async (req, res) => {
 
 `);
             }
-          } catch (e) {}
+          } catch (e) { }
         }
       }
-      
+
       res.write('data: [DONE]\n\n');
       res.end();
       return;
     }
-    
-    // Detect file generation request
-    const fileGenMatch = message.match(/(?:provide|give|create|generate|make).*?(?:in|as|to)\s+(pdf|docx|txt|csv|json|xml|html|md)/i);
-    const isFileGeneration = fileGenMatch !== null;
 
     // Handle Gemini model
     if (model === 'gemini-pro') {
@@ -369,7 +431,7 @@ router.post('/chat', upload.array('files'), async (req, res) => {
             parts: [{ text: messages[i].content }]
           });
         }
-        
+
         let currentContent;
         if (imageData) {
           const base64Data = imageData.image_url.url.split(',')[1];
@@ -381,7 +443,7 @@ router.post('/chat', upload.array('files'), async (req, res) => {
         } else {
           currentContent = [{ text: userMessage }];
         }
-        
+
         const result = await genAI.models.generateContentStream({
           model: 'gemini-2.5-flash',
           contents: [...geminiHistory, { role: 'user', parts: currentContent }],
@@ -446,7 +508,7 @@ router.post('/chat', upload.array('files'), async (req, res) => {
             const parsed = JSON.parse(data);
             const content = parsed.choices[0]?.delta?.content;
             const reasoning = parsed.choices[0]?.delta?.reasoning;
-            
+
             if (reasoning) {
               res.write(`data: ${JSON.stringify({ reasoning })}
 
@@ -517,10 +579,10 @@ router.post('/chat', upload.array('files'), async (req, res) => {
         }
         return { role: m.role, content };
       });
-      
+
       const { error, output } = await bytezModel.run(bytezMessages);
       if (error) throw new Error(error);
-      
+
       // Extract content from response
       let responseText = '';
       if (typeof output === 'object' && output.content) {
@@ -534,7 +596,7 @@ router.post('/chat', upload.array('files'), async (req, res) => {
       } else {
         responseText = JSON.stringify(output);
       }
-      
+
       fullResponse = responseText;
       res.write(`data: ${JSON.stringify({ content: fullResponse })}
 
@@ -571,11 +633,11 @@ router.post('/chat', upload.array('files'), async (req, res) => {
         stream: true,
         stop: null
       };
-      
+
       if (model === 'qwen-32b') {
         groqConfig.reasoning_effort = 'default';
       }
-      
+
       const chatCompletion = await groq.chat.completions.create(groqConfig);
       let thinkingContent = '';
       for await (const chunk of chatCompletion) {
@@ -598,43 +660,185 @@ router.post('/chat', upload.array('files'), async (req, res) => {
 
     // Handle file generation if detected
     if (isFileGeneration && fullResponse) {
-      const fileType = fileGenMatch[1].toLowerCase();
-      const mimeTypes = {
-        pdf: 'application/pdf',
-        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        txt: 'text/plain',
-        csv: 'text/csv',
-        json: 'application/json',
-        xml: 'application/xml',
-        html: 'text/html',
-        md: 'text/markdown'
-      };
-      
-      const cleanContent = fullResponse.replace(/<[^>]*>/g, '').replace(/```[\s\S]*?```/g, (match) => {
-        return match.replace(/```\w*\n?/, '').replace(/```$/, '');
-      }).trim();
-      
-      const filename = `response.${fileType}`;
-      const encodedContent = encodeURIComponent(cleanContent);
-      
-      fullResponse += `\n\n<div class="file-download" style="margin-top:20px; padding:16px; background:#1F2023; border-radius:12px; border:1px solid #444;"><div style="display:flex; align-items:center; gap:12px;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><div style="flex:1;"><div style="color:#fff; font-weight:500;">${filename}</div><div style="color:#9CA3AF; font-size:14px; margin-top:2px;">Click to download</div></div><button data-download data-content="${encodedContent}" data-filename="${filename}" data-type="${mimeTypes[fileType]}" style="background:#3b82f6; color:#fff; padding:8px 16px; border-radius:8px; border:none; cursor:pointer; font-weight:500;">Download</button></div></div>`;
+      try {
+        const fileType = detectedFileType;
+        const mimeTypes = {
+          // Documents
+          pdf: 'application/pdf',
+          docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+
+          // Data formats
+          json: 'application/json',
+          jsonl: 'application/x-jsonlines',
+          ndjson: 'application/x-jsonlines',
+          csv: 'text/csv',
+          tsv: 'text/tab-separated-values',
+          xml: 'application/xml',
+          yaml: 'text/yaml',
+          yml: 'text/yaml',
+          toml: 'text/plain',
+          ini: 'text/plain',
+          properties: 'text/plain',
+
+          // Markup & Styling
+          html: 'text/html',
+          html5: 'text/html',
+          xhtml: 'application/xhtml+xml',
+          md: 'text/markdown',
+          markdown: 'text/markdown',
+          svg: 'image/svg+xml',
+          css: 'text/css',
+          scss: 'text/plain',
+          less: 'text/plain',
+
+          // Programming languages
+          js: 'text/javascript',
+          javascript: 'text/javascript',
+          ts: 'text/plain',
+          typescript: 'text/plain',
+          jsx: 'text/plain',
+          tsx: 'text/plain',
+          py: 'text/plain',
+          python: 'text/plain',
+          java: 'text/plain',
+          cpp: 'text/plain',
+          'c++': 'text/plain',
+          cs: 'text/plain',
+          csharp: 'text/plain',
+          go: 'text/plain',
+          golang: 'text/plain',
+          rust: 'text/plain',
+          ruby: 'text/plain',
+          php: 'text/plain',
+          shell: 'text/plain',
+          bash: 'text/plain',
+          sh: 'text/plain',
+          dart: 'text/plain',
+          kotlin: 'text/plain',
+          swift: 'text/plain',
+          groovy: 'text/plain',
+          r: 'text/plain',
+          matlab: 'text/plain',
+          latex: 'text/plain',
+          tex: 'text/plain',
+          sql: 'text/plain',
+          graphql: 'text/plain',
+          gql: 'text/plain',
+
+          // Web & Frameworks
+          astro: 'text/plain',
+          dockerfile: 'text/plain',
+          makefile: 'text/plain',
+          gradle: 'text/plain',
+          maven: 'application/xml',
+          pom: 'application/xml',
+
+          // Configuration
+          env: 'text/plain',
+          gitignore: 'text/plain',
+
+          // Default
+          txt: 'text/plain'
+        };
+
+        const fileMimeType = mimeTypes[fileType] || 'text/plain';
+        console.log(`[FILE_GEN] Detected ${fileType} generation request`);
+
+        // Generate a smart filename from user's message
+        const smartName = message
+          .replace(/(?:provide|give|create|generate|make|return|output|save|export|download|write|send|convert|build|prepare|compile|produce|render|get|as|a|an|the|it|in|on|for|of|with|about|please|can you|could you|i need|i want|i require|here|this|that|no|not|just|me|link|button|now|format|file|document|to|into)/gi, '')
+          .replace(/\b(pdf|docx|txt|csv|tsv|json|jsonl|ndjson|xml|yaml|yml|md|markdown|sql|toml|ini|properties|svg|html|html5|xhtml|astro|jsx|tsx|py|python|js|javascript|ts|typescript|cpp|java|cs|csharp|go|golang|rust|shell|bash|sh|ruby|php|dockerfile|makefile|gradle|maven|pom|dart|kotlin|swift|groovy|latex|tex|r|matlab|css|scss|less|gql|graphql|env|gitignore)\b/gi, '')
+          .replace(/[^a-zA-Z0-9\s]/g, '')
+          .trim()
+          .split(/\s+/)
+          .filter(w => w.length > 1)
+          .slice(0, 5)
+          .join('_')
+          .toLowerCase() || 'document';
+        const filename = `${smartName}.${fileType}`;
+        console.log(`[FILE_GEN] Generated filename: ${filename}`);
+
+        // Send a loading message for the file generation
+        res.write(`data: ${JSON.stringify({ content: '\n\n[FILE_GENERATING]' })}\n\n`);
+
+        // Generate the binary buffer from the AI response markdown
+        console.log(`[FILE_GEN] Converting response to ${fileType}...`);
+        const fileData = await generateFileBuffer(fullResponse, fileType);
+        console.log(`[FILE_GEN] Buffer created: ${fileData.buffer.length} bytes, mime: ${fileData.mimetype}`);
+
+        if (!fileData.buffer || fileData.buffer.length === 0) {
+          throw new Error(`Empty buffer generated for ${fileType} file`);
+        }
+
+        // Check file size (MongoDB 16MB document limit)
+        if (fileData.buffer.length > 15 * 1024 * 1024) {
+          throw new Error(`File too large: ${(fileData.buffer.length / 1024 / 1024).toFixed(2)}MB exceeds 15MB limit`);
+        }
+
+        // Convert to base64 and validate
+        let base64Data;
+        try {
+          base64Data = fileData.buffer.toString('base64');
+          if (!base64Data || base64Data.length === 0) {
+            throw new Error('Base64 encoding resulted in empty string');
+          }
+          console.log(`[FILE_GEN] Base64 encoded: ${base64Data.length} chars (original: ${fileData.buffer.length} bytes)`);
+        } catch (encodeError) {
+          throw new Error(`Failed to encode buffer to base64: ${encodeError.message}`);
+        }
+
+        // Store file in MongoDB
+        const FileDownload = (await import('../models/FileDownload.js')).default;
+        try {
+          const fileRecord = await FileDownload.create({
+            filename: filename,
+            mimetype: fileData.mimetype,
+            data: base64Data,
+            size: fileData.buffer.length
+          });
+          console.log(`[FILE_GEN] File stored in DB with ID: ${fileRecord._id} (${base64Data.length} chars base64)`);
+
+          // Generate the strict tag footprint
+          const downloadUrl = `${process.env.VITE_API_URL || 'http://localhost:8000'}/api/upload/download/${fileRecord._id}`;
+          const fileDownloadObj = {
+            filename: filename,
+            url: downloadUrl,
+            size: fileData.buffer.length,
+            type: fileData.mimetype
+          };
+          const footprint = `\n\n[FILE_DOWNLOAD:${JSON.stringify(fileDownloadObj)}]`;
+
+          console.log(`[FILE_GEN] Download link generated: ${downloadUrl}`);
+          console.log(`[FILE_GEN] Footprint: ${footprint}`);
+
+          fullResponse += footprint;
+          res.write(`data: ${JSON.stringify({ content: footprint.replace('\n\n*Processing file generation...*', '') })}\n\n`);
+        } catch (dbError) {
+          throw new Error(`Failed to store file in database: ${dbError.message}`);
+        }
+      } catch (genError) {
+        console.error('[FILE_GEN] Error:', genError);
+        const errorMsg = `\n\n[Failed to generate or store ${detectedFileType.toUpperCase()} file. Error: ${genError.message}]`;
+        fullResponse += errorMsg;
+        res.write(`data: ${JSON.stringify({ content: errorMsg })}\n\n`);
+      }
     }
-    
+
     // Auto-save to memory if user asks to save/remember
     const lowerMsg = message.toLowerCase();
-    if (userId && userId !== 'guest' && 
-        (lowerMsg.includes('save this') || lowerMsg.includes('remember this') || 
-         lowerMsg.includes('store this') || lowerMsg.includes('save that') || 
-         lowerMsg.includes('remember that'))) {
+    if (userId && userId !== 'guest' &&
+      (lowerMsg.includes('save this') || lowerMsg.includes('remember this') ||
+        lowerMsg.includes('store this') || lowerMsg.includes('save that') ||
+        lowerMsg.includes('remember that'))) {
       try {
         const UserMemory = (await import('../models/UserMemory.js')).default;
         let userMemory = await UserMemory.findOne({ userId });
-        
+
         // Extract the information to save (remove the save/remember command)
         let infoToSave = message
           .replace(/save this|remember this|store this|save that|remember that/gi, '')
           .trim();
-        
+
         if (infoToSave) {
           if (!userMemory) {
             userMemory = new UserMemory({ userId, memories: [infoToSave] });

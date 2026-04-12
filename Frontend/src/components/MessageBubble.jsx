@@ -1,5 +1,8 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Copy, Check, ChevronDown, ChevronRight, X, Maximize2, ZoomIn, ZoomOut, Download, Maximize, Sun, Moon, ArrowUp } from 'lucide-react';
@@ -7,6 +10,251 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import mermaid from 'mermaid';
 import { ChartView } from './Charts';
+import Papa from 'papaparse';
+import DataTable, { createTheme } from 'react-data-table-component';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import ReactPlayer from 'react-player';
+import L from 'leaflet';
+import { FileDownloadButton } from './FileDownloadButton';
+import { generateCSV, generateJSON, generateXML, generateText, generateHTML, generateMarkdown, generateYAML, generatePDF } from '../utils/fileGenerators';
+
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+createTheme('dark', {
+  text: { primary: '#e5e7eb', secondary: '#9ca3af' },
+  background: { default: '#1a1a1a' },
+  context: { background: '#cb4b16', text: '#FFFFFF' },
+  divider: { default: '#374151' },
+  action: { button: 'rgba(0,0,0,.54)', hover: 'rgba(0,0,0,.08)', disabled: 'rgba(0,0,0,.12)' },
+}, 'dark');
+
+const CsvDataTable = ({ csvString }) => {
+  const { data, columns } = useMemo(() => {
+    let parsedData = [];
+    let parsedColumns = [];
+    try {
+      Papa.parse(csvString, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (result) => {
+          if (result.data && result.data.length > 0) {
+            parsedData = result.data;
+            parsedColumns = Object.keys(result.data[0]).map(key => ({
+              name: key,
+              selector: row => row[key],
+              sortable: true,
+              wrap: true,
+            }));
+          }
+        }
+      });
+    } catch (e) {
+      console.error('CSV parse error', e);
+    }
+    return { data: parsedData, columns: parsedColumns };
+  }, [csvString]);
+
+  // Generate different format contents
+  const csvContent = data.length > 0 ? Papa.unparse(data) : csvString;
+  const jsonContent = data.length > 0 ? JSON.stringify(data, null, 2) : csvString;
+  const xmlContent = data.length > 0 ? convertCsvToXml(data) : csvString;
+
+  if (!data || data.length === 0) return <div className="text-gray-400 text-sm p-4">Parsing CSV data...</div>;
+
+  return (
+    <div className="my-4 border border-gray-600 rounded-xl overflow-hidden">
+      <div className="bg-gray-800 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs font-semibold text-gray-300">📊 Data Grid</span>
+        <div className="flex items-center gap-2">
+          <FileDownloadButton
+            filename="data.csv"
+            type="text/csv"
+            content={csvContent}
+            description="Comma-separated values"
+            size={new Blob([csvContent]).size}
+          />
+          <FileDownloadButton
+            filename="data.json"
+            type="application/json"
+            content={jsonContent}
+            description="JavaScript Object Notation"
+            size={new Blob([jsonContent]).size}
+          />
+          <FileDownloadButton
+            filename="data.xml"
+            type="application/xml"
+            content={xmlContent}
+            description="eXtensible Markup Language"
+            size={new Blob([xmlContent]).size}
+          />
+        </div>
+      </div>
+      <div className="bg-[#1a1a1a]">
+        <DataTable
+          columns={columns}
+          data={data}
+          pagination
+          theme="dark"
+          customStyles={{
+            headRow: { style: { backgroundColor: '#1f2937', color: '#f3f4f6', fontWeight: 'bold', borderBottom: '1px solid #374151' } },
+            cells: { style: { color: '#d1d5db' } },
+            pagination: { style: { backgroundColor: '#1a1a1a', color: '#d1d5db', borderTop: '1px solid #374151' } }
+          }}
+          paginationPerPage={5}
+          paginationRowsPerPageOptions={[5, 10, 20]}
+        />
+      </div>
+    </div>
+  );
+};
+
+// Helper to convert CSV data to XML
+const convertCsvToXml = (data) => {
+  if (!data || data.length === 0) return '<?xml version="1.0"?><root/>';
+  const headers = Object.keys(data[0]);
+  const rows = data.map(row => {
+    const cols = headers.map(h => `<${h}>${escapeXml(String(row[h] || ''))}</${h}>`).join('');
+    return `<row>${cols}</row>`;
+  }).join('');
+  return `<?xml version="1.0" encoding="UTF-8"?><root>${rows}</root>`;
+};
+
+const escapeXml = (str) =>
+  str.replace(/[<>&'"]/g, c => ({
+    '<': '&lt;',
+    '>': '&gt;',
+    '&': '&amp;',
+    "'": '&apos;',
+    '"': '&quot;'
+  }[c]));
+
+// Convert chart JSON to CSV format
+const convertChartToCSV = (chartData) => {
+  const { xAxis, series } = chartData;
+  if (!series) return '';
+
+  const categories = xAxis?.data || [];
+  const seriesList = Array.isArray(series) ? series : [series];
+
+  // Headers
+  const headers = ['Category', ...seriesList.map(s => s.name || 'Value')];
+  const headerRow = headers.join(',');
+
+  // Data rows
+  const rows = categories.map((cat, idx) => {
+    const values = seriesList.map(s => {
+      const val = s.data?.[idx];
+      return val !== undefined ? val : '';
+    });
+    return [cat, ...values].join(',');
+  });
+
+  return [headerRow, ...rows].join('\n');
+};
+
+// Convert chart JSON to XML format
+const convertChartToXML = (chartData) => {
+  const { xAxis, series } = chartData;
+  const seriesList = Array.isArray(series) ? series : [series];
+
+  const chartEl = `<chart>
+  <xAxis type="${xAxis?.type || 'category'}">
+    ${(xAxis?.data || []).map(v => `<data>${escapeXml(String(v))}</data>`).join('\n    ')}
+  </xAxis>
+  ${seriesList.map((s, i) => `
+  <series index="${i}" name="${escapeXml(s.name || `Series ${i + 1}`)}" type="${s.type || 'line'}">
+    ${(s.data || []).map(v => `<point>${v}</point>`).join('\n    ')}
+  </series>`).join('')}
+</chart>`.trim();
+
+  return `<?xml version="1.0" encoding="UTF-8"?>\n${chartEl}`;
+};
+
+const MapEmbedRenderer = ({ jsonString }) => {
+  let mapData;
+  try {
+    mapData = JSON.parse(jsonString);
+  } catch (e) {
+    return <div className="text-red-400 text-sm">Failed to parse map data JSON.</div>;
+  }
+
+  const { lat: aiLat, lng: aiLng, zoom: aiZoom = 13, markers: aiMarkers = [], query } = mapData;
+
+  const [geoData, setGeoData] = useState(null);
+  const [loading, setLoading] = useState(!!query);
+
+  useEffect(() => {
+    if (!query) return;
+    let cancelled = false;
+    const geocode = async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`,
+          { headers: { 'Accept-Language': 'en' } }
+        );
+        const results = await res.json();
+        if (!cancelled && results && results.length > 0) {
+          const place = results[0];
+          setGeoData({
+            lat: parseFloat(place.lat),
+            lng: parseFloat(place.lon),
+            displayName: place.display_name,
+          });
+        }
+      } catch (err) {
+        console.error('Geocoding failed, using AI coordinates:', err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    geocode();
+    return () => { cancelled = true; };
+  }, [query]);
+
+  const finalLat = geoData?.lat ?? aiLat ?? 0;
+  const finalLng = geoData?.lng ?? aiLng ?? 0;
+  const zoom = aiZoom;
+  const center = [finalLat, finalLng];
+
+  const markers = geoData
+    ? [{ lat: geoData.lat, lng: geoData.lng, popup: geoData.displayName || query }]
+    : aiMarkers.length > 0
+      ? aiMarkers
+      : (aiLat && aiLng) ? [{ lat: aiLat, lng: aiLng, popup: query || 'Location' }] : [];
+
+  if (loading) {
+    return (
+      <div className="my-4 rounded-xl overflow-hidden border border-gray-600 h-[300px] sm:h-[400px] w-full flex items-center justify-center bg-[#1a1a1a]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-4 border-gray-600 border-t-blue-500 rounded-full animate-spin"></div>
+          <span className="text-gray-400 text-sm">Finding location...</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="my-4 rounded-xl overflow-hidden border border-gray-600 h-[300px] sm:h-[400px] w-full relative z-0">
+      <MapContainer center={center} zoom={zoom} scrollWheelZoom={false} className="h-full w-full z-0">
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        {markers.map((m, idx) => (
+          <Marker key={idx} position={[m.lat, m.lng]}>
+            {m.popup && <Popup>{m.popup}</Popup>}
+          </Marker>
+        ))}
+      </MapContainer>
+    </div>
+  );
+};
 
 /* Try to parse potentially-malformed JSON from LLM */
 const parseChartJSON = (raw) => {
@@ -30,13 +278,55 @@ const ChartBlockRenderer = ({ codeString, onSendMessage }) => {
   const [rawJson, setRawJson] = useState(codeString);
   const [editing, setEditing] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const chartRef = useRef(null);
 
   const parsed = parseChartJSON(rawJson);
 
+  // Generate export data from chart config
+  const generateExportData = () => {
+    if (!parsed) return null;
+    const jsonContent = JSON.stringify(parsed, null, 2);
+    const csvContent = convertChartToCSV(parsed);
+    const xmlContent = convertChartToXML(parsed);
+    return { json: jsonContent, csv: csvContent, xml: xmlContent };
+  };
+
+  const exportData = generateExportData();
+
   return (
     <div className="my-4">
+      {/* Download toolbar */}
+      {parsed && exportData && (
+        <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
+          <span className="text-[10px] text-gray-400 uppercase tracking-wider py-1">Export:</span>
+          <FileDownloadButton
+            filename="chart-data.json"
+            type="application/json"
+            content={exportData.json}
+            description="Chart configuration"
+            size={new Blob([exportData.json]).size}
+          />
+          <FileDownloadButton
+            filename="chart-data.csv"
+            type="text/csv"
+            content={exportData.csv}
+            description="Series data as CSV"
+            size={new Blob([exportData.csv]).size}
+          />
+          <FileDownloadButton
+            filename="chart-data.xml"
+            type="application/xml"
+            content={exportData.xml}
+            description="Series data as XML"
+            size={new Blob([exportData.xml]).size}
+          />
+        </div>
+      )}
+
       {parsed ? (
-        <ChartView data={parsed} />
+        <div ref={chartRef}>
+          <ChartView data={parsed} />
+        </div>
       ) : (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 overflow-hidden">
           <div className="px-4 py-2 text-red-400 text-xs font-medium border-b border-red-500/20">
@@ -447,10 +737,83 @@ export const MessageBubble = ({ content, role, versions, currentVersion, onVersi
       answer = answer.replace(/\[CANVAS\][\s\S]*?\[\/CANVAS\]/i, '');
     }
 
-    return { thinking, webSearch, canvas, answer: answer.trim() };
+    // Extract video
+    let videos = [];
+    const videoRegex = /\[VIDEO:(.*?)\]/gi;
+    let videoMatch;
+    while ((videoMatch = videoRegex.exec(answer)) !== null) {
+      if (videoMatch[1]) videos.push(videoMatch[1].trim());
+    }
+    answer = answer.replace(videoRegex, '');
+
+    return { thinking, webSearch, canvas, videos, answer: answer.trim() };
   };
 
-  const { thinking, webSearch, canvas, answer } = parseReasoningResponse(content);
+  // Parse file download blocks
+  const parseDownloadBlocks = (text) => {
+    const downloads = [];
+    
+    // New JSON Format: handles [FILE_DOWNLOAD:{...}] or hallucinated ones like [DOCX_FILE_DOWNLOAD:{...}]
+    // Updated regex to handle multiline JSON and complex nested objects
+    const jsonRegex = /\[(?:[A-Z_]*)?DOWNLOAD:\s*(\{[\s\S]*?\})\s*\]/gi;
+    let match;
+    let lastIndex = 0;
+    
+    while ((match = jsonRegex.exec(text)) !== null) {
+      try {
+        const jsonStr = match[1].trim();
+        // Try to parse JSON - handle potential errors gracefully
+        const parsed = JSON.parse(jsonStr);
+        
+        // Validate that required fields exist
+        if (parsed.filename && (parsed.url || parsed.content || parsed.data || parsed.base64)) {
+          downloads.push(parsed);
+        }
+      } catch (e) {
+        
+        // Fallback: try to extract values if JSON parsing fails
+        try {
+          const urlMatch = /["']?url["']?\s*:\s*["']([^"']+)["']/i.exec(match[1]);
+          const filenameMatch = /["']?filename["']?\s*:\s*["']([^"']+)["']/i.exec(match[1]);
+          const typeMatch = /["']?type["']?\s*:\s*["']([^"']+)["']/i.exec(match[1]);
+          
+          if (urlMatch && filenameMatch) {
+            downloads.push({
+              filename: filenameMatch[1],
+              url: urlMatch[1],
+              type: typeMatch ? typeMatch[1] : 'application/octet-stream'
+            });
+          }
+        } catch (fallbackError) {
+          // Fallback parsing failed
+        }
+      }
+    }
+
+    // Legacy Key-Value Format: [DOWNLOAD:filename=report.pdf,type=application/pdf]
+    const legacyRegex = /\[(?:[A-Z_]+)?DOWNLOAD:([^\]]+)\]/gi;
+    while ((match = legacyRegex.exec(text)) !== null) {
+      // Skip if this was already matched by JSON regex
+      if (text.substring(match.index, match.index + match[0].length).includes('{')) continue;
+      
+      const params = match[1];
+      const parsed = {};
+      params.split(',').forEach(part => {
+        const [key, value] = part.split('=');
+        if (key && value) parsed[key.trim()] = value.trim().replace(/^["']|["']$/g, '');
+      });
+      if (parsed.filename && (parsed.content || parsed.url || parsed.data || parsed.base64)) {
+        downloads.push(parsed);
+      }
+    }
+    
+    return downloads;
+  };
+
+  const { thinking, webSearch, canvas, videos, answer } = parseReasoningResponse(content);
+  const downloads = parseDownloadBlocks(answer);
+  const isGeneratingFile = answer.includes('[FILE_GENERATING]') && downloads.length === 0;
+  const cleanedAnswer = answer.replace(/\[FILE_GENERATING\]/g, '').replace(/\[(?:[A-Z_]*)?DOWNLOAD:\s*\{[\s\S]*?\}\s*\]/gi, '').replace(/\[(?:[A-Z_]+)?DOWNLOAD:[^\]]+\]/gi, '').trim();
 
   const handleCopyCode = (code, index) => {
     navigator.clipboard.writeText(code);
@@ -504,6 +867,13 @@ export const MessageBubble = ({ content, role, versions, currentVersion, onVersi
   // Check if content contains HTML media elements, loader, or file download
   const hasMediaHTML = answer.includes('<video') || answer.includes('<audio') || answer.includes('media-container') || answer.includes('loader-box') || answer.includes('file-download');
 
+  const GeneratingSpinner = () => (
+    <div className="flex items-center gap-3 p-3 mt-3 bg-[#1e1e1e]/60 border border-white/5 rounded-xl text-blue-400 w-fit">
+      <div className="w-5 h-5 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin"></div>
+      <span className="text-sm font-medium">Generating structured document...</span>
+    </div>
+  );
+
   return (
     <div className={`rounded-2xl w-full overflow-x-auto ${role === 'user' ? 'bg-[#171717] border border-white/10 text-white px-3 py-1' : 'text-white px-2 py-1'
       }`}>
@@ -549,17 +919,28 @@ export const MessageBubble = ({ content, role, versions, currentVersion, onVersi
           <div className="text-xs text-gray-400 whitespace-pre-wrap">{webSearch}</div>
         </div>
       )}
+      {videos && videos.length > 0 && (
+        <div className="flex flex-col gap-4 mb-4">
+          {videos.map((vid, idx) => (
+            <div key={idx} className="rounded-xl overflow-hidden shadow-lg border border-gray-600 bg-black aspect-video w-full max-w-3xl">
+               <ReactPlayer url={vid} width="100%" height="100%" controls />
+            </div>
+          ))}
+        </div>
+      )}
       {canvas && (
         <div className="mb-4 border-l-4 border-pink-500 bg-pink-500/10 rounded-r-lg p-4">
           <div className="text-sm font-semibold text-pink-400 mb-2">🎨 Canvas Content</div>
           <div className="text-xs text-gray-300 whitespace-pre-wrap font-mono">{canvas}</div>
         </div>
       )}
+
       {hasMediaHTML ? (
-        <div ref={mediaRef} dangerouslySetInnerHTML={{ __html: filteredAnswer }} />
+        <div ref={mediaRef} dangerouslySetInnerHTML={{ __html: cleanedAnswer }} />
       ) : (
         <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
+          remarkPlugins={[remarkGfm, remarkMath]}
+          rehypePlugins={[rehypeKatex]}
           components={{
             code({ node, inline, className, children, ...props }) {
               const match = /language-(\w+)/.exec(className || '');
@@ -575,6 +956,23 @@ export const MessageBubble = ({ content, role, versions, currentVersion, onVersi
                 return <ChartBlockRenderer codeString={codeString} onSendMessage={onSendMessage} />;
               }
 
+              if (match && match[1].toLowerCase() === 'csv') {
+                return <CsvDataTable csvString={codeString} />;
+              }
+
+              if (match && match[1].toLowerCase() === 'map') {
+                return <MapEmbedRenderer jsonString={codeString} />;
+              }
+
+              if (match && match[1].toLowerCase() === 'json') {
+                try {
+                  const parsed = JSON.parse(codeString);
+                  if (parsed && typeof parsed === 'object' && 'lat' in parsed && 'lng' in parsed && 'zoom' in parsed) {
+                    return <MapEmbedRenderer jsonString={codeString} />;
+                  }
+                } catch (e) {}
+              }
+
               return !inline && match ? (
                 <div className="relative group my-4">
                   <div className="flex items-center justify-between bg-[#1e1e1e] px-2 sm:px-4 py-2 rounded-t-lg border-b border-black/50">
@@ -586,22 +984,25 @@ export const MessageBubble = ({ content, role, versions, currentVersion, onVersi
                       </div>
                       <span className="text-[10px] sm:text-xs text-gray-400 ml-2">{match[1]}</span>
                     </div>
-                    <button
-                      onClick={() => handleCopyCode(codeString, codeIndex)}
-                      className="flex items-center gap-1 px-1.5 sm:px-2 py-1 text-[10px] sm:text-xs bg-white/10 hover:bg-white/20 rounded transition-colors"
-                    >
-                      {copiedCode === codeIndex ? (
-                        <>
-                          <Check className="w-3 h-3" />
-                          <span className="hidden sm:inline">Copied</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3 h-3" />
-                          <span className="hidden sm:inline">Copy</span>
-                        </>
-                      )}
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleCopyCode(codeString, codeIndex)}
+                        className="flex items-center gap-1 px-1.5 sm:px-2 py-1 text-[10px] sm:text-xs bg-white/10 hover:bg-white/20 rounded transition-colors"
+                        title="Copy code"
+                      >
+                        {copiedCode === codeIndex ? (
+                          <>
+                            <Check className="w-3 h-3" />
+                            <span className="hidden sm:inline">Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            <span className="hidden sm:inline">Copy</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                   <div className="overflow-x-auto">
                     <SyntaxHighlighter
@@ -689,19 +1090,47 @@ export const MessageBubble = ({ content, role, versions, currentVersion, onVersi
                     onClick={() => window.open(src, '_blank')}
                   />
                   <button
-                    onClick={(e) => {
+                    onClick={async (e) => {
+                      e.preventDefault();
                       e.stopPropagation();
-                      const a = document.createElement('a');
-                      a.href = src;
-                      a.download = 'image.png';
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
+                      try {
+                        // Always proxy the download to bypass CORS restrictions entirely
+                        const fetchUrl = `${import.meta.env.VITE_API_URL}/api/upload/proxy?url=${encodeURIComponent(src)}`;
+                          
+                        const response = await fetch(fetchUrl);
+                        if (!response.ok) throw new Error('Fetch failed');
+                        
+                        const blob = await response.blob();
+                        const blobUrl = URL.createObjectURL(blob);
+                        
+                        const a = document.createElement('a');
+                        a.href = blobUrl;
+                        // Extract filename from URL or default to image.png
+                        const urlObj = new URL(src);
+                        const pathname = urlObj.pathname;
+                        const defaultFilename = pathname.substring(pathname.lastIndexOf('/') + 1) || 'image.png';
+                        a.download = defaultFilename;
+                        
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(blobUrl);
+                      } catch (error) {
+                        console.error('Image download failed, falling back to open:', error);
+                        // Fallback if CORS prevents fetching the blob
+                        const a = document.createElement('a');
+                        a.href = src;
+                        a.download = 'image.png';
+                        a.target = '_blank';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                      }
                     }}
-                    className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm"
+                    className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-all backdrop-blur-sm z-10 cursor-pointer hover:scale-110 active:scale-95"
                     title="Download Image"
                   >
-                    <ArrowUp className="w-4 h-4 rotate-180" />
+                    <Download className="w-4 h-4" />
                   </button>
                 </div>
               );
@@ -714,9 +1143,35 @@ export const MessageBubble = ({ content, role, versions, currentVersion, onVersi
             },
           }}
         >
-          {answer}
+          {cleanedAnswer}
         </ReactMarkdown>
       )}
+
+      {/* File downloads at the bottom of the chat bubble */}
+      {downloads.length > 0 && downloads.map((file, idx) => {
+        let dataAttr = '';
+        if (file.content) {
+          dataAttr = encodeURIComponent(file.content);
+        } else if (file.data || file.base64) {
+          dataAttr = `data:${file.type || 'application/octet-stream'};base64,${file.data || file.base64}`;
+        }
+        const isUrl = !!file.url;
+
+        return (
+          <div key={idx} className="mt-4 mb-1">
+            <FileDownloadButton
+              filename={file.filename || 'download'}
+              type={file.type || 'application/octet-stream'}
+              content={dataAttr}
+              url={isUrl ? file.url : null}
+              description={file.description || 'Download file'}
+            />
+          </div>
+        );
+      })}
+
+      {/* Spinner for pending file generations */}
+      {isGeneratingFile && <GeneratingSpinner />}
     </div>
   );
 };
