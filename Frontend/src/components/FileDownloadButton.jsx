@@ -121,24 +121,30 @@ export const FileDownloadButton = ({ filename, type = 'text/plain', content, url
             }
           }
         } else {
+          let fetchUrl = url;
           try {
-            // Route Cloudinary URLs through backend proxy to avoid 401 errors
-            const fetchUrl = url.includes('res.cloudinary.com')
-              ? `${import.meta.env.VITE_API_URL}/api/upload/proxy?url=${encodeURIComponent(url)}`
-              : url;
+            // Fix hardcoded localhost or relative paths from old DB footprints or proxy mismatches
+            if (url.includes('/api/upload/download/')) {
+              const fileId = url.split('/api/upload/download/')[1].split(/[?#]/)[0];
+              fetchUrl = `${import.meta.env.VITE_API_URL}/api/upload/download/${fileId}`;
+            } else if (url.includes('res.cloudinary.com')) {
+              // Route Cloudinary URLs through backend proxy to avoid 401 errors
+              fetchUrl = `${import.meta.env.VITE_API_URL}/api/upload/proxy?url=${encodeURIComponent(url)}`;
+            }
+
             const response = await fetch(fetchUrl);
-            if (!response.ok) throw new Error('Fetch failed');
+            if (!response.ok) throw new Error(`Fetch failed with status: ${response.status}`);
             const blob = await response.blob();
             blobUrlToOpen = URL.createObjectURL(blob);
           } catch (fetchErr) {
             console.error('Blob fetch failed, falling back:', fetchErr);
             if (forceDownload || !isPreviewable) {
               const a = document.createElement('a');
-              a.href = url;
+              a.href = fetchUrl;
               a.download = filename || 'download';
               a.click();
             } else {
-              window.open(url, '_blank');
+              window.open(fetchUrl, '_blank');
             }
             return;
           }

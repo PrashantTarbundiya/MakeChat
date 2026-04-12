@@ -528,9 +528,6 @@ RULES:
     }
     // Handle Bytez Image Generation
     else if (model === 'bytez-image') {
-      res.write(`data: ${JSON.stringify({ content: '<div class="loader-box" style="padding:20px; background:#1F2023; border-radius:12px; border:1px solid #444; text-align:center;"><div style="display:inline-block; width:40px; height:40px; border:4px solid #333; border-top-color:#3b82f6; border-radius:50%; animation:spin 1s linear infinite;"></div><style>@keyframes spin{to{transform:rotate(360deg)}}</style><div style="margin-top:15px; color:#fff; font-weight:500;">🎨 Generating image...</div><div style="margin-top:8px; color:#9CA3AF; font-size:14px;">This may take a moment, please wait...</div></div>' })}
-
-`);
       const cleanPrompt = message.replace(/^\[.*?:\s*/, '').replace(/\]$/, '').trim();
       const bytezModel = bytez.model(MODELS[model]);
       const { error, output } = await bytezModel.run(cleanPrompt);
