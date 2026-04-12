@@ -3,6 +3,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
+import katex from 'katex';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Copy, Check, ChevronDown, ChevronRight, X, Maximize2, ZoomIn, ZoomOut, Download, Maximize, Sun, Moon, ArrowUp } from 'lucide-react';
@@ -253,6 +254,48 @@ const MapEmbedRenderer = ({ jsonString }) => {
         ))}
       </MapContainer>
     </div>
+  );
+};
+
+// Math block renderer for ```math and ```latex blocks
+const MathBlock = ({ math, inline = false }) => {
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      try {
+        katex.render(math, containerRef.current, {
+          throwOnError: false,
+          displayMode: !inline,
+          output: 'html',
+          trust: true
+        });
+      } catch (err) {
+        console.error('KaTeX rendering error:', err);
+        containerRef.current.textContent = math;
+      }
+    }
+  }, [math, inline]);
+
+  return (
+    <>
+      <style>{`
+        .katex-display {
+          margin: 1.5rem 0 !important;
+          font-size: 1.25em !important;
+          text-align: center !important;
+        }
+        .katex {
+          font-size: 1.1em !important;
+        }
+      `}</style>
+      <div 
+        ref={containerRef} 
+        className={`my-6 overflow-x-auto py-4 text-xl sm:text-2xl ${
+          !inline ? 'flex justify-center bg-white/5 rounded-xl border border-white/10 shadow-lg' : ''
+        }`}
+      />
+    </>
   );
 };
 
@@ -971,6 +1014,10 @@ export const MessageBubble = ({ content, role, versions, currentVersion, onVersi
                     return <MapEmbedRenderer jsonString={codeString} />;
                   }
                 } catch (e) {}
+              }
+
+              if (match && (match[1].toLowerCase() === 'math' || match[1].toLowerCase() === 'latex')) {
+                return <MathBlock math={codeString} />;
               }
 
               return !inline && match ? (
