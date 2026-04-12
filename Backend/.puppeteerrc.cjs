@@ -6,5 +6,5 @@ const {join} = require('path');
 module.exports = {
   // Changes the cache location for Puppeteer so it is cached in the project directory
   // This is required for Render deployments to avoid losing the chromium executable.
-  cacheDirectory: join(__dirname, '.cache', 'puppeteer'),
+  cacheDirectory: join(__dirname, '.puppeteer-cache'),
 };
