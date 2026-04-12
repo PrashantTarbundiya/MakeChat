@@ -67,10 +67,14 @@ router.post('/store-download', async (req, res) => {
     const FileDownload = (await import('../models/FileDownload.js')).default;
     const file = await FileDownload.create({ filename, mimetype: mimetype || 'application/octet-stream', data, size });
     
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.get('host');
+    const downloadUrl = `${protocol}://${host}/api/upload/download/${file._id}`;
+
     res.json({
       success: true,
       downloadId: file._id,
-      downloadUrl: `/api/upload/download/${file._id}`
+      downloadUrl: downloadUrl
     });
   } catch (error) {
     console.error('Store download error:', error);

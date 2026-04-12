@@ -799,7 +799,9 @@ RULES:
           console.log(`[FILE_GEN] File stored in DB with ID: ${fileRecord._id} (${base64Data.length} chars base64)`);
 
           // Generate the strict tag footprint
-          const downloadUrl = `${process.env.VITE_API_URL || 'http://localhost:8000'}/api/upload/download/${fileRecord._id}`;
+          const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+          const host = req.get('host');
+          const downloadUrl = `${protocol}://${host}/api/upload/download/${fileRecord._id}`;
           const fileDownloadObj = {
             filename: filename,
             url: downloadUrl,
