@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, Brain, Zap, MessageCircle, Network, MapPin, FileText } from 'lucide-react';
+import { Sparkles, Brain, Zap, MessageCircle, Network, MapPin, FileText, Box } from 'lucide-react';
 
 import { useMotionValue, useSpring, useTransform } from 'framer-motion';
 
@@ -128,12 +128,20 @@ export const Features = () => {
            />
            
              <FeatureCard 
-             title="Voice Interaction"
-             description="Speak your mind. Natural voice input and output makes chatting with AI feel like a real conversation."
-             icon={MessageCircle}
-             delay={0.4}
-             className="md:col-span-3"
-           />
+               title="Voice Interaction"
+               description="Speak your mind. Natural voice input and output makes chatting with AI feel like a real conversation."
+               icon={MessageCircle}
+               delay={0.4}
+               className="md:col-span-2"
+             />
+
+             <FeatureCard 
+               title="3D Model Generation"
+               description="Generate fully interactive, high-fidelity 3D models and components simply by describing them."
+               icon={Box}
+               delay={0.5}
+               className="md:col-span-1"
+             />
         </div>
 
         {/* Creative Studio Tools */}

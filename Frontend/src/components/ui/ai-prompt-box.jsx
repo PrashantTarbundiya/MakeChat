@@ -1,7 +1,7 @@
 import React from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ArrowUp, Paperclip, Square, X, StopCircle, Mic, Globe, BrainCog, FolderCode } from "lucide-react";
+import { ArrowUp, Paperclip, Square, X, StopCircle, Mic, Globe, BrainCog, FolderCode, Cuboid } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
@@ -51,7 +51,7 @@ const TooltipContent = React.forwardRef(({ className, sideOffset = 4, ...props }
     ref={ref}
     sideOffset={sideOffset}
     className={cn(
-      "z-50 overflow-hidden rounded-md border border-white/10 bg-[#0A0A0A] px-3 py-1.5 text-sm text-white shadow-md animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+      "z-60 overflow-hidden rounded-md border border-white/10 bg-[#0A0A0A] px-3 py-1.5 text-sm text-white shadow-md animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
       className
     )}
     {...props}
@@ -65,7 +65,7 @@ const DialogOverlay = React.forwardRef(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      "fixed inset-0 z-60 bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className
     )}
     {...props}
@@ -79,7 +79,7 @@ const DialogContent = React.forwardRef(({ className, children, ...props }, ref) 
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-[90vw] md:max-w-[800px] translate-x-[-50%] translate-y-[-50%] gap-4 border border-white/10 bg-[#0A0A0A] p-0 shadow-xl duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 rounded-2xl",
+        "fixed left-[50%] top-[50%] z-60 grid w-full max-w-[90vw] md:max-w-[800px] translate-x-[-50%] translate-y-[-50%] gap-4 border border-white/10 bg-[#0A0A0A] p-0 shadow-xl duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 rounded-2xl",
         className
       )}
       {...props}
@@ -464,6 +464,13 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
     { id: 'bytez-music', name: 'Music Gen' }
   ];
 
+  const SPECIAL_MODEL_LABELS = {
+    'mode-diagram': '📊 Diagram Gen',
+    'mode-map': '🗺️ Map Gen',
+    'mode-3d': '📦 3D Expert',
+    'mode-file': '📄 File Gen'
+  };
+
 
 
   const handleToggleChange = (value) => {
@@ -655,15 +662,17 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
                   ? "Think deeply..."
                   : showCanvas
                     ? "Create on canvas..."
-                    : selectedModel === 'bytez-image'
-                      ? "Describe the image you want to generate..."
-                      : selectedModel === 'bytez-video'
-                        ? "Describe the video you want to create..."
-                        : selectedModel === 'bytez-audio'
-                          ? "Describe the audio you want to generate..."
-                          : selectedModel === 'bytez-music'
-                            ? "Describe the music you want to create..."
-                            : placeholder
+                    : (selectedModel === 'mode-3d' || input.startsWith('[3D:'))
+                      ? "Ask the 3D Engineer to visualize something..."
+                      : selectedModel === 'bytez-image'
+                        ? "Describe the image you want to generate..."
+                        : selectedModel === 'bytez-video'
+                          ? "Describe the video you want to create..."
+                          : selectedModel === 'bytez-audio'
+                            ? "Describe the audio you want to generate..."
+                            : selectedModel === 'bytez-music'
+                              ? "Describe the music you want to create..."
+                              : placeholder
             }
             className="text-base"
           />
@@ -693,12 +702,16 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
                 className="flex h-8 px-2 sm:px-3 text-[#9CA3AF] cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-gray-600/30 hover:text-[#D1D5DB] text-[10px] sm:text-xs font-medium gap-1"
                 disabled={isRecording}
               >
-                <span className="hidden sm:inline">{models.find(m => m.id === selectedModel)?.name}</span>
-                <span className="sm:hidden">{models.find(m => m.id === selectedModel)?.name.split(' ')[0]}</span>
+                <span className="hidden sm:inline">
+                  {models.find(m => m.id === selectedModel)?.name || SPECIAL_MODEL_LABELS[selectedModel] || 'AI Model'}
+                </span>
+                <span className="sm:hidden">
+                  {(models.find(m => m.id === selectedModel)?.name || SPECIAL_MODEL_LABELS[selectedModel] || 'AI').split(' ')[0]}
+                </span>
                 <span className="text-[10px]">▼</span>
               </button>
               {showModelDropdown && (
-                <div className="absolute bottom-full left-0 mb-2 bg-[#1F2023] border border-[#444444] rounded-xl shadow-lg overflow-hidden z-50 min-w-[180px] max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
+                <div className="absolute bottom-full left-0 mb-2 bg-[#1F2023] border border-[#444444] rounded-xl shadow-lg overflow-hidden z-60 min-w-[180px] max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
                   {models.map(model => (
                     <button
                       key={model.id}

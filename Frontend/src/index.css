@@ -66,6 +66,12 @@ body {
   }
 }
 
+@keyframes skeletonBar {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(200%); }
+  100% { transform: translateX(-100%); }
+}
+
 @supports (padding: env(safe-area-inset-bottom)) {
   .pb-safe {
     padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));

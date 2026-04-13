@@ -3,7 +3,7 @@ import { Menu, Share2 } from 'lucide-react';
 
 export const Header = ({ sidebarOpen, setSidebarOpen, currentChatId, onShare }) => {
   return (
-    <div className="fixed top-0 left-0 right-0 h-[50px] bg-black border-b border-white/10 flex items-center justify-between px-4 z-50">
+    <div className="fixed top-0 left-0 right-0 h-[50px] bg-black border-b border-white/10 flex items-center justify-between px-4 z-[44]">
       <div className="flex items-center gap-3">
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}

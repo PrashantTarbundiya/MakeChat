@@ -643,9 +643,12 @@ function App({ user, isShared = false }) {
       return;
     }
 
-    if (['mode-diagram', 'mode-map', 'mode-file'].includes(chatId)) {
+    if (['mode-diagram', 'mode-map', 'mode-file', 'mode-3d'].includes(chatId)) {
       setSidebarOpen(false);
-      const prefix = chatId === 'mode-diagram' ? '[Diagram: ' : chatId === 'mode-map' ? '[Map: ' : '[File:docx] ';
+      const prefix = chatId === 'mode-diagram' ? '[Diagram: ' 
+                   : chatId === 'mode-map' ? '[Map: ' 
+                   : chatId === 'mode-3d' ? '[3D: '
+                   : '[File:docx] ';
       window.dispatchEvent(new CustomEvent('inject-prompt', { detail: prefix }));
       return;
     }

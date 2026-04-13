@@ -11,6 +11,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import mermaid from 'mermaid';
 import { ChartView } from './Charts';
+import { ThreeView } from './ThreeView';
 import Papa from 'papaparse';
 import DataTable, { createTheme } from 'react-data-table-component';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
@@ -987,7 +988,15 @@ export const MessageBubble = ({ content, role, versions, currentVersion, onVersi
           components={{
             code({ node, inline, className, children, ...props }) {
               const match = /language-(\w+)/.exec(className || '');
+              // Guard: if children is undefined/null, return empty inline code
+              if (children == null || (Array.isArray(children) && children.length === 0)) {
+                return <code className="bg-gray-700 px-1.5 py-0.5 rounded text-sm break-all" {...props} />;
+              }
               const codeString = String(children).replace(/\n$/, '');
+              // Guard: skip rendering components for empty or trivially short strings
+              if (!codeString || codeString === 'undefined' || codeString === 'null' || codeString.trim().length < 3) {
+                return <code className="bg-gray-700 px-1.5 py-0.5 rounded text-sm break-all" {...props}>{codeString}</code>;
+              }
               const codeIndex = node?.position?.start?.line || 0;
 
               if (match && match[1].toLowerCase() === 'mermaid') {
@@ -1014,6 +1023,22 @@ export const MessageBubble = ({ content, role, versions, currentVersion, onVersi
                     return <MapEmbedRenderer jsonString={codeString} />;
                   }
                 } catch (e) {}
+              }
+
+              const language = match ? match[1].toLowerCase() : '';
+              
+              // 3D detection: explicitly tagged as '3d' always renders.
+              // For html/js/untagged blocks, require BOTH a Three.js signature AND
+              // structural markers (importmap, DOCTYPE, or full HTML) to avoid
+              // treating broken AI fragments as renderable 3D scenes.
+              const hasThreeSignature = codeString.includes('THREE.Scene') || codeString.includes('OrbitControls') || codeString.includes('THREE.PerspectiveCamera');
+              const hasStructuralMarker = codeString.includes('importmap') || codeString.includes('<!DOCTYPE') || codeString.includes('<html');
+              const isSubstantial = codeString.length > 200; // Reject tiny broken fragments
+              
+              if (language === '3d' || 
+                 ((language === 'html' || language === 'javascript' || !language) && 
+                  hasThreeSignature && hasStructuralMarker && isSubstantial)) {
+                return <ThreeView data={codeString} />;
               }
 
               if (match && (match[1].toLowerCase() === 'math' || match[1].toLowerCase() === 'latex')) {

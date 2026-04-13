@@ -7,6 +7,7 @@ import mammoth from 'mammoth';
 import { createRequire } from 'module';
 import dotenv from 'dotenv';
 import { SYSTEM_PROMPT } from '../config/systemPrompt.js';
+import { SPECIALIZED_3D_PROMPT } from '../config/specialized3DPrompt.js';
 import { performWebSearch } from '../utils/webSearch.js';
 import { uploadToCloudinary } from '../utils/uploadToCloudinary.js';
 import { generateFileBuffer } from '../utils/fileGenerator.js';
@@ -170,6 +171,8 @@ router.post('/chat', upload.array('files'), async (req, res) => {
       userMessage = message + '\n\nCRITICAL INSTRUCTION: Analyze the request and ONLY output a valid Map configuration JSON wrapped in a ```json mapConfig code block. Include center coordinates, zoom, and points of interest markers. Do NOT provide any other text.';
     }
 
+
+
     // Detect file generation request — comprehensive multi-pattern detection
     const FILE_TYPES_PATTERN = '(pdf|docx|txt|csv|tsv|json|xml|yaml|yml|md|markdown|sql|jsonl|ndjson|toml|ini|properties|svg|html|html5|xhtml|astro|jsx|tsx|py|python|js|javascript|ts|typescript|cpp|java|cs|csharp|go|golang|rust|shell|bash|sh|ruby|php|dockerfile|makefile|gradle|maven|pom|dart|kotlin|swift|groovy|latex|tex|r|matlab|css|scss|less|gql|graphql|env|gitignore)';
     const lowerMessage = message.toLowerCase();
@@ -212,7 +215,9 @@ router.post('/chat', upload.array('files'), async (req, res) => {
     const detectedFileType = fileGenMatch ? (fileGenMatch[1] || 'pdf').toLowerCase() : null;
 
     // Build messages array with history from DB or request
-    let systemPrompt = SYSTEM_PROMPT;
+    // Detect 3D mode: [3D:...], [3D ...], [3D rendering:...], [3d model:...], etc.
+    const is3DMode = model === 'mode-3d' || /^\[3[dD]\s*[:\-\s]/i.test(message.trim());
+    let systemPrompt = is3DMode ? SPECIALIZED_3D_PROMPT : SYSTEM_PROMPT;
     if (isFileGeneration) {
       const ft = detectedFileType.toUpperCase();
       const hasHistory = !!(history || chatId);
@@ -269,17 +274,25 @@ RULES:
       }
     }
 
+    // For 3D mode, wrap user message with reinforcement directive
+    let userMessage_final = userMessage;
+    if (is3DMode) {
+      userMessage_final = `REMINDER: You MUST output ONLY a single \`\`\`3d code block containing a complete, self-contained HTML file. NO text before or after. NO descriptions. NO explanations. Just the code block.
+
+USER REQUEST: ${userMessage}`;
+    }
+
     // Add user message with image if present
     if (imageData) {
       messages.push({
         role: 'user',
         content: [
-          { type: 'text', text: userMessage },
+          { type: 'text', text: userMessage_final },
           imageData
         ]
       });
     } else {
-      messages.push({ role: 'user', content: userMessage });
+      messages.push({ role: 'user', content: userMessage_final });
     }
 
     let fullResponse = '';

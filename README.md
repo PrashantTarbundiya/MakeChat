@@ -12,6 +12,8 @@ A full-stack AI chat application with multi-model support, user authentication, 
 - 🎯 **Multi-AI Model Support** - Google Gemini, OpenRouter, Groq, HuggingFace
 - 🔐 **Authentication** - JWT & Google OAuth 2.0
 - 💬 **Real-time Chat** - Streaming responses with markdown support
+- 🎲 **3D Model Generation** - Interactive, code-generated Three.js models in real-time
+- 🗺️ **Canvas Generation** - Interactive maps and Mermaid.js diagram generation
 - 📁 **File Upload** - PDF & DOCX document processing
 - 🔍 **Web Search** - Integrated search capabilities
 - 🧠 **User Memory** - Personalized conversation context
@@ -252,6 +254,12 @@ Upload and process documents:
 - PDF files with text extraction
 - DOCX files with content parsing
 - Automatic cloud storage via Cloudinary
+
+### Real-Time Asset Generation
+The application features a secure, sandboxed Canvas and 3D Viewer capable of rendering:
+- **3D Models**: Using a God-Tier specialized prompt and Three.js framework to generate highly detailed and anatomically structured 3D scenes.
+- **Diagrams**: Native Mermaid.js integration for flowchart and architecture mapping.
+- **Interactive Maps**: Geographic visualizations rendered seamlessly via Leaflet.
 
 ### User Memory System
 Personalized AI experience:

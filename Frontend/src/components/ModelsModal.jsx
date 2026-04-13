@@ -1,4 +1,4 @@
-import { X, Sparkles, Network, Map, FileCode2, Image as ImageIcon, Film, Mic, Music, BrainCircuit } from 'lucide-react';
+import { X, Sparkles, Network, Map, FileCode2, Image as ImageIcon, Film, Mic, Music, BrainCircuit, Cuboid } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const ModelsModal = ({ isOpen, onClose, onSelectModel }) => {
@@ -8,6 +8,7 @@ export const ModelsModal = ({ isOpen, onClose, onSelectModel }) => {
       models: [
         { id: 'mode-diagram', name: 'Diagram Generator', desc: 'Generate visual architectures & flowcharts', Icon: Network, color: 'text-emerald-400', glow: 'group-hover:shadow-[0_0_20px_rgba(52,211,153,0.15)] group-hover:border-emerald-500/40' },
         { id: 'mode-map', name: 'Interactive Map', desc: 'Render geographical locations & routes', Icon: Map, color: 'text-purple-400', glow: 'group-hover:shadow-[0_0_20px_rgba(167,139,250,0.15)] group-hover:border-purple-500/40' },
+        { id: 'mode-3d', name: '3D Expert Engineer', desc: 'Expert visualization for complex 3D models', Icon: Cuboid, color: 'text-blue-400', glow: 'group-hover:shadow-[0_0_20px_rgba(59,130,246,0.15)] group-hover:border-blue-500/40' },
         { id: 'mode-file', name: 'File Generator', desc: 'Securely generate downloadable documents', Icon: FileCode2, color: 'text-orange-400', glow: 'group-hover:shadow-[0_0_20px_rgba(251,146,60,0.15)] group-hover:border-orange-500/40' },
       ]
     },
@@ -33,25 +34,25 @@ export const ModelsModal = ({ isOpen, onClose, onSelectModel }) => {
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-hidden">
           {/* Stunning Animated Backdrop */}
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="absolute inset-0 bg-black/70 backdrop-blur-md"
             onClick={onClose}
           />
-          
-          <motion.div 
+
+          <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: "spring", duration: 0.5, bounce: 0.3 }}
-            className="bg-[#0f1014]/90 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 sm:p-8 w-full max-w-[850px] max-h-[85vh] mx-auto flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.5)] relative overflow-hidden" 
+            className="bg-[#0f1014]/90 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 sm:p-8 w-full max-w-[850px] max-h-[85vh] mx-auto flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.5)] relative overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Top Gloss Highlights */}
             <div className="absolute top-0 right-0 left-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-            
+
             <div className="flex items-center justify-between mb-8 relative z-10">
               <div className="flex items-center gap-4">
                 <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/5 shadow-inner">
@@ -64,8 +65,8 @@ export const ModelsModal = ({ isOpen, onClose, onSelectModel }) => {
                   <p className="text-sm text-gray-500 mt-1.5 font-medium">Select a fully isolated execution environment</p>
                 </div>
               </div>
-              <button 
-                onClick={onClose} 
+              <button
+                onClick={onClose}
                 className="p-2.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-all hover:rotate-90 duration-300"
               >
                 <X className="w-5 h-5" />
@@ -74,11 +75,11 @@ export const ModelsModal = ({ isOpen, onClose, onSelectModel }) => {
 
             <div className="flex-1 overflow-y-auto pr-2 -mr-2 space-y-8 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent pb-4">
               {modelCategories.map((category, catIdx) => (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: catIdx * 0.1 }}
-                  key={catIdx} 
+                  key={catIdx}
                   className="space-y-4 relative"
                 >
                   <div className="flex items-center gap-4">
@@ -87,7 +88,7 @@ export const ModelsModal = ({ isOpen, onClose, onSelectModel }) => {
                     </h4>
                     <div className="h-px bg-gradient-to-r from-white/[0.08] to-transparent flex-1" />
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {category.models.map((model, i) => (
                       <motion.button
@@ -100,13 +101,13 @@ export const ModelsModal = ({ isOpen, onClose, onSelectModel }) => {
                         }}
                         className={`group relative flex items-start gap-4 p-5 bg-[#17181c] border border-white/[0.04] rounded-2xl text-left transition-all duration-300 overflow-hidden ${model.glow}`}
                       >
-                         {/* Flowing background glow on hover */}
+                        {/* Flowing background glow on hover */}
                         <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-                        
+
                         <div className={`p-3 rounded-xl bg-black/40 border border-white/5 shadow-inner transition-colors duration-300 group-hover:bg-black/60 relative z-10`}>
                           <model.Icon className={`w-6 h-6 ${model.color}`} />
                         </div>
-                        
+
                         <div className="relative z-10 pt-1">
                           <span className="block text-base tracking-wide text-gray-200 group-hover:text-white font-semibold transition-colors duration-300 mb-1">
                             {model.name}
