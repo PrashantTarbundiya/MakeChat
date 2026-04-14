@@ -3,6 +3,7 @@ import ReactECharts from 'echarts-for-react';
 import * as echarts from 'echarts';
 import { Maximize2, X, ZoomIn, ZoomOut, Maximize, Sun, Moon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Network, ChevronRight, RotateCcw } from 'lucide-react';
 
 // Pre-fetch world map geometry if needed by the chart
 let worldMapRegistered = false;
@@ -140,6 +141,109 @@ const ChartView = ({ data }) => {
     return <div className="my-4 text-red-400 text-xs bg-red-500/10 p-4 rounded-xl">Invalid chart data</div>;
   }
 
+  const [expandedNodes, setExpandedNodes] = useState(new Set());
+  const [extraNodes, setExtraNodes] = useState([]);
+  const [extraLinks, setExtraLinks] = useState([]);
+
+  // Helper: normalize a single graph node so `name` is always set and unique
+  const normalizeNode = (node) => {
+    const name = node.name || node.id || `node_${Math.random().toString(36).substr(2, 8)}`;
+    return { ...node, name, id: undefined }; // ECharts graph uses `name` as the key, `id` can conflict
+  };
+
+  // Helper: deduplicate nodes by `name`, keeping the first occurrence
+  const deduplicateNodes = (nodes) => {
+    const seen = new Set();
+    return nodes.filter(n => {
+      if (seen.has(n.name)) return false;
+      seen.add(n.name);
+      return true;
+    });
+  };
+
+  // Helper: normalize link source/target to use node `name` values
+  const normalizeLinks = (links, nodeNameSet) => {
+    return links.filter(l => {
+      const src = l.source?.name || l.source;
+      const tgt = l.target?.name || l.target;
+      return nodeNameSet.has(src) && nodeNameSet.has(tgt);
+    }).map(l => ({
+      ...l,
+      source: l.source?.name || l.source,
+      target: l.target?.name || l.target
+    }));
+  };
+
+  // Generate sub-nodes for graph charts
+  const expandGraphNode = (nodeName, baseNodes, baseLinks) => {
+    if (expandedNodes.has(nodeName)) return;
+
+    const nodeData = baseNodes.find(n => n.name === nodeName);
+    if (!nodeData) return;
+
+    // Collect all existing names (base + already-added extras)
+    const existingNames = new Set(baseNodes.map(n => n.name));
+    extraNodes.forEach(n => existingNames.add(n.name));
+
+    const aspects = ['Origins', 'Impact', 'Key Figures', 'Timeline', 'Legacy', 'Details'];
+    const relations = ['aspect of', 'part of', 'related to', 'influenced by'];
+
+    const count = Math.min(3, aspects.length);
+    const shuffled = [...aspects].sort(() => Math.random() - 0.5);
+
+    const newNodes = [];
+    const newLinks = [];
+
+    for (let i = 0; i < count; i++) {
+      const subName = `${nodeName}_sub_${i}`;
+      if (existingNames.has(subName)) continue; // skip duplicates
+      existingNames.add(subName);
+
+      newNodes.push({
+        name: subName,
+        label: { show: true, formatter: `${shuffled[i]} of ${nodeName}`, fontSize: 10 },
+        value: (nodeData.value || 1) * 0.8,
+        category: (nodeData.category || 0) + 1,
+        description: `Dynamic exploration of ${shuffled[i].toLowerCase()}`,
+        symbolSize: 25,
+        itemStyle: { borderColor: 'rgba(255,255,255,0.4)', borderWidth: 1, opacity: 0.85, shadowBlur: 10 }
+      });
+      newLinks.push({
+        source: nodeName,
+        target: subName,
+        label: { show: true, formatter: relations[i % relations.length], fontSize: 9 },
+        lineStyle: { width: 1.5, type: 'dashed' }
+      });
+    }
+
+    if (newNodes.length > 0) {
+      setExtraNodes(prev => [...prev, ...newNodes]);
+      setExtraLinks(prev => [...prev, ...newLinks]);
+    }
+
+    setExpandedNodes(prev => new Set([...prev, nodeName]));
+  };
+
+  const handleChartClick = (params) => {
+    if (params.seriesType === 'graph' && params.dataType === 'node') {
+      // Use the original data series (pre-merge) so we don't double-count extras
+      const origSeries = data?.series?.[params.seriesIndex];
+      if (!origSeries) return;
+      const baseNodes = (origSeries.data || []).map(normalizeNode);
+      const baseLinks = origSeries.links || origSeries.edges || [];
+      expandGraphNode(params.name, baseNodes, baseLinks);
+    } else {
+      setIsFullscreen(true);
+    }
+  };
+
+  const resetGraph = (e) => {
+    e.stopPropagation();
+    setExtraNodes([]);
+    setExtraLinks([]);
+    setExpandedNodes(new Set());
+  };
+
   let processedData = data;
   if (data.labels && data.values) {
     const isPie = data.type === 'pie' || data.type === 'donut';
@@ -156,6 +260,38 @@ const ChartView = ({ data }) => {
           radius: data.type === 'donut' ? ['40%', '70%'] : isPie ? '50%' : undefined
         }
       ]
+    };
+  }
+
+  // Inject dynamic graph expansions with full deduplication
+  if (processedData && processedData.series) {
+    processedData = {
+      ...processedData,
+      series: processedData.series.map(s => {
+        if (s.type === 'graph') {
+          // 1) Normalize all base nodes
+          const baseNodes = (s.data || []).map(normalizeNode);
+          // 2) Merge with extras and deduplicate
+          const mergedNodes = deduplicateNodes([...baseNodes, ...extraNodes]);
+          // 3) Build a set of valid node names
+          const validNames = new Set(mergedNodes.map(n => n.name));
+          // 4) Normalize links and drop any pointing to missing nodes
+          const baseLinks = s.links || s.edges || [];
+          const mergedLinks = normalizeLinks([...baseLinks, ...extraLinks], validNames);
+          // 5) Apply expanded-node styling
+          const styledNodes = mergedNodes.map(n => {
+            if (expandedNodes.has(n.name)) {
+              return {
+                ...n,
+                itemStyle: { ...(n.itemStyle || {}), borderColor: '#f59e0b', borderWidth: 3, shadowBlur: 20, shadowColor: 'rgba(245,158,11,0.5)' }
+              };
+            }
+            return n;
+          });
+          return { ...s, data: styledNodes, links: mergedLinks, edges: undefined };
+        }
+        return s;
+      })
     };
   }
 
@@ -264,7 +400,7 @@ const ChartView = ({ data }) => {
               opts={{ renderer: 'svg' }}
               notMerge={true}
               lazyUpdate={true}
-              onEvents={{ click: () => setIsFullscreen(true) }}
+              onEvents={{ click: handleChartClick }}
             />
           </div>
         </ChartErrorBoundary>
@@ -275,6 +411,16 @@ const ChartView = ({ data }) => {
           <Maximize2 className="w-3.5 h-3.5" />
           <span className="text-[10px] uppercase font-bold tracking-wider">Expand</span>
         </button>
+
+        {expandedNodes.size > 0 && (
+          <button 
+            onClick={resetGraph}
+            className="absolute top-4 right-24 p-1.5 bg-black/60 hover:bg-black/80 rounded-md text-amber-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity backdrop-blur-sm flex items-center gap-1 z-10"
+          >
+            <RotateCcw className="w-3 h-3" />
+            <span className="text-[10px] uppercase font-bold tracking-wider">Reset</span>
+          </button>
+        )}
       </div>
 
       <AnimatePresence>
@@ -324,6 +470,7 @@ const ChartView = ({ data }) => {
                     opts={{ renderer: 'svg' }}
                     notMerge={true}
                     lazyUpdate={true}
+                    onEvents={{ click: handleChartClick }}
                   />
                 </ChartErrorBoundary>
               </div>

@@ -790,7 +790,73 @@ export const MessageBubble = ({ content, role, versions, currentVersion, onVersi
     }
     answer = answer.replace(videoRegex, '');
 
-    return { thinking, webSearch, canvas, videos, answer: answer.trim() };
+    // Extract knowledge graph and convert to ECharts graph option
+    let knowledgeGraph = null;
+    const kgMatch = answer.match(/\[KNOWLEDGE_GRAPH\]([\s\S]*?)\[\/KNOWLEDGE_GRAPH\]/i);
+    if (kgMatch) {
+      try {
+        let jsonStr = kgMatch[1].trim();
+        // Remove markdown formatting if the model wrapped it in ```json ... ```
+        if (jsonStr.startsWith('```')) {
+          jsonStr = jsonStr.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
+        }
+        const rawGraph = JSON.parse(jsonStr);
+        const nodes = rawGraph.nodes || [];
+        const links = rawGraph.links || rawGraph.edges || [];
+        const palette = ['#8b5cf6','#06b6d4','#f59e0b','#ef4444','#10b981','#3b82f6','#ec4899','#6366f1','#14b8a6'];
+        const categories = Array.from(new Set(nodes.map(n => n.category || 0))).map(c => ({ name: String(c) }));
+
+        // Convert to full ECharts graph option
+        knowledgeGraph = {
+          backgroundColor: 'transparent',
+          tooltip: {
+            trigger: 'item',
+            formatter: (params) => {
+              if (params.dataType === 'node') {
+                return `<div style="font-weight:bold">${params.name}</div>${params.data.description ? `<div style="font-size:11px;color:#aaa;margin-top:4px">${params.data.description}</div>` : ''}`;
+              }
+              if (params.dataType === 'edge') return `${params.data.source} → ${params.data.target}`;
+            },
+            backgroundColor: 'rgba(20,20,20,0.95)',
+            borderColor: '#333',
+            textStyle: { color: '#fff' }
+          },
+          color: palette,
+          animationDuration: 1500,
+          animationEasingUpdate: 'quinticInOut',
+          series: [{
+            type: 'graph',
+            layout: 'force',
+            roam: true,
+            draggable: true,
+            categories: categories,
+            data: nodes.map((n, i) => ({
+              name: n.id || n.name || `Node ${i}`,
+              value: n.value || 1,
+              category: n.category || 0,
+              description: n.description || '',
+              symbolSize: Math.max(25, Math.min(60, (n.value || 1) * 10 + 22)),
+              label: { show: true, formatter: n.label || n.id || n.name, position: 'bottom', color: '#fff', textBorderColor: '#000', textBorderWidth: 3, fontSize: 11, distance: 8 },
+              itemStyle: { borderColor: '#fff', borderWidth: 1.5, shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.4)' }
+            })),
+            links: links.map(l => ({
+              source: l.source,
+              target: l.target,
+              label: { show: !!(l.label || l.name), formatter: l.label || l.name || '', fontSize: 9 },
+              lineStyle: { color: 'source', curveness: 0.2, width: 2 }
+            })),
+            force: { repulsion: 300, gravity: 0.1, edgeLength: [60, 200], friction: 0.6 },
+            lineStyle: { color: 'source', curveness: 0.2 },
+            emphasis: { focus: 'adjacency', lineStyle: { width: 4 } }
+          }]
+        };
+      } catch (e) {
+        console.error("Failed to parse knowledge graph JSON", e);
+      }
+      answer = answer.replace(/\[KNOWLEDGE_GRAPH\][\s\S]*?\[\/KNOWLEDGE_GRAPH\]/i, '');
+    }
+
+    return { thinking, webSearch, canvas, videos, knowledgeGraph, answer: answer.trim() };
   };
 
   // Parse file download blocks
@@ -854,7 +920,7 @@ export const MessageBubble = ({ content, role, versions, currentVersion, onVersi
     return downloads;
   };
 
-  const { thinking, webSearch, canvas, videos, answer } = parseReasoningResponse(content);
+  const { thinking, webSearch, canvas, videos, knowledgeGraph, answer } = parseReasoningResponse(content);
   const downloads = parseDownloadBlocks(answer);
   const isGeneratingFile = answer.includes('[FILE_GENERATING]') && downloads.length === 0;
   const cleanedAnswer = answer.replace(/\[FILE_GENERATING\]/g, '').replace(/\[(?:[A-Z_]*)?DOWNLOAD:\s*\{[\s\S]*?\}\s*\]/gi, '').replace(/\[(?:[A-Z_]+)?DOWNLOAD:[^\]]+\]/gi, '').trim();
@@ -977,6 +1043,9 @@ export const MessageBubble = ({ content, role, versions, currentVersion, onVersi
           <div className="text-sm font-semibold text-pink-400 mb-2">🎨 Canvas Content</div>
           <div className="text-xs text-gray-300 whitespace-pre-wrap font-mono">{canvas}</div>
         </div>
+      )}
+      {knowledgeGraph && (
+        <ChartView data={knowledgeGraph} />
       )}
 
       {hasMediaHTML ? (

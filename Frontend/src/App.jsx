@@ -984,6 +984,7 @@ function App({ user, isShared = false }) {
                           currentVersion={msg.currentVersion || 0}
                           onVersionChange={(v) => handleVersionChange(i, v)}
                           onSendMessage={(text) => handleSendMessage(text, [], selectedModel)}
+
                         />
                       )}
                       {msg.thinking && msg.role === 'assistant' && editingIndex !== i && (
@@ -1104,6 +1105,7 @@ function App({ user, isShared = false }) {
       )}
       <QueryOutline messages={messages} onScrollTo={handleScrollToMessage} />
       <Settings user={user} isOpen={settingsOpen} setIsOpen={setSettingsOpen} onLogout={handleLogout} />
+
 
 
     </div>

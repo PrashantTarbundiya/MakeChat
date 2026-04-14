@@ -752,7 +752,7 @@ USER REQUEST: ${userMessage}`;
         };
 
         const fileMimeType = mimeTypes[fileType] || 'text/plain';
-        console.log(`[FILE_GEN] Detected ${fileType} generation request`);
+
 
         // Generate a smart filename from user's message
         const smartName = message
@@ -766,15 +766,15 @@ USER REQUEST: ${userMessage}`;
           .join('_')
           .toLowerCase() || 'document';
         const filename = `${smartName}.${fileType}`;
-        console.log(`[FILE_GEN] Generated filename: ${filename}`);
+
 
         // Send a loading message for the file generation
         res.write(`data: ${JSON.stringify({ content: '\n\n[FILE_GENERATING]' })}\n\n`);
 
         // Generate the binary buffer from the AI response markdown
-        console.log(`[FILE_GEN] Converting response to ${fileType}...`);
+
         const fileData = await generateFileBuffer(fullResponse, fileType);
-        console.log(`[FILE_GEN] Buffer created: ${fileData.buffer.length} bytes, mime: ${fileData.mimetype}`);
+
 
         if (!fileData.buffer || fileData.buffer.length === 0) {
           throw new Error(`Empty buffer generated for ${fileType} file`);
@@ -792,7 +792,7 @@ USER REQUEST: ${userMessage}`;
           if (!base64Data || base64Data.length === 0) {
             throw new Error('Base64 encoding resulted in empty string');
           }
-          console.log(`[FILE_GEN] Base64 encoded: ${base64Data.length} chars (original: ${fileData.buffer.length} bytes)`);
+
         } catch (encodeError) {
           throw new Error(`Failed to encode buffer to base64: ${encodeError.message}`);
         }
@@ -806,7 +806,7 @@ USER REQUEST: ${userMessage}`;
             data: base64Data,
             size: fileData.buffer.length
           });
-          console.log(`[FILE_GEN] File stored in DB with ID: ${fileRecord._id} (${base64Data.length} chars base64)`);
+
 
           // Generate the strict tag footprint
           const protocol = req.headers['x-forwarded-proto'] || req.protocol;
@@ -820,8 +820,7 @@ USER REQUEST: ${userMessage}`;
           };
           const footprint = `\n\n[FILE_DOWNLOAD:${JSON.stringify(fileDownloadObj)}]`;
 
-          console.log(`[FILE_GEN] Download link generated: ${downloadUrl}`);
-          console.log(`[FILE_GEN] Footprint: ${footprint}`);
+
 
           fullResponse += footprint;
           res.write(`data: ${JSON.stringify({ content: footprint.replace('\n\n*Processing file generation...*', '') })}\n\n`);
@@ -829,7 +828,7 @@ USER REQUEST: ${userMessage}`;
           throw new Error(`Failed to store file in database: ${dbError.message}`);
         }
       } catch (genError) {
-        console.error('[FILE_GEN] Error:', genError);
+
         const errorMsg = `\n\n[Failed to generate or store ${detectedFileType.toUpperCase()} file. Error: ${genError.message}]`;
         fullResponse += errorMsg;
         res.write(`data: ${JSON.stringify({ content: errorMsg })}\n\n`);

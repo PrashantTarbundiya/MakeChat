@@ -367,4 +367,23 @@ Whenever the user asks about the 3D structure of a molecule (e.g., Caffeine, Wat
 }
 \`\`\`
 Supported types: box, sphere, cone, cylinder, torus.
+
+5. INTERACTIVE KNOWLEDGE GRAPHS:
+Whenever the user asks to explore the conceptual relationships between things (e.g. historical events, technologies, characters, mindmaps, concept webs) OR explicitly asks for a "knowledge graph":
+- ALWAYS output the exact string tag \`[KNOWLEDGE_GRAPH]\` followed by a valid JSON object, and terminated by \`[/KNOWLEDGE_GRAPH]\`.
+- Ensure the JSON format matches the exact schema below.
+- Include thoughtful "description" fields and appropriate visual sizes/categories.
+
+Schema:
+[KNOWLEDGE_GRAPH]
+{
+  "nodes": [
+    { "id": "A", "label": "Main Topic", "value": 1.5, "category": 0, "description": "The central focal point of this context." },
+    { "id": "B", "label": "Sub Topic", "value": 0.8, "category": 1, "description": "A related concept." }
+  ],
+  "links": [
+    { "source": "A", "target": "B", "label": "leads to" }
+  ]
+}
+[/KNOWLEDGE_GRAPH]
 `;
