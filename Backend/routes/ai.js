@@ -124,25 +124,40 @@ router.post('/chat', upload.array('files'), async (req, res) => {
     // Detect mode and perform actions
     let userMessage = message + documentText;
 
-    if (message.startsWith('[Search:')) {
-      const query = message.replace(/^\[Search:\s*/, '').replace(/\]$/, '');
+    // Auto-detect financial / stock queries even if the user forgot the [Search:] tag
+    let userQuery = message;
+    let isAutoSearch = false;
+    if (!message.startsWith('[Search:') && !message.startsWith('[Think:') && !message.startsWith('[Canvas:')) {
+       if (/(live|stock|share|price|ticker|market cap)\b/i.test(message)) {
+          isAutoSearch = true;
+          userQuery = '[Search: ' + message + ']';
+       }
+    }
+
+    if (userQuery.startsWith('[Search:')) {
+      const query = userQuery.replace(/^\[Search:\s*/, '').replace(/\]$/, '');
       try {
         const searchResults = await performWebSearch(query);
 
         if (searchResults) {
-          const searchContext = `\n\nWeb Search Results for "${query}":\n` +
+          const searchContext = `\n\n=== LIVE REAL-TIME DATA SYSTEM INJECTION ===\nHere is the absolute guaranteed factual live data for your query. YOU DO NOT NEED TO SEARCH THE WEB YOURSELF. Use this data EXACTLY as provided to fulfill the user's request.\n` +
             searchResults.map((r, i) =>
-              `${i + 1}. ${r.title}\n   ${r.snippet}\n   Source: ${r.url}\n`
+              `${i + 1}. [DATA]: ${r.title}\n   [DETAILS]: ${r.snippet}\n`
             ).join('\n');
+            
           userMessage = message + searchContext;
+          
+          if (isAutoSearch) {
+             userMessage += `\n\n[SYSTEM COMMAND TO AI]: Generate a \`\`\`bento json dashboard immediately using the live numbers provided above. DO NOT write "Step 1: I will search...". The search is ALREADY DONE. Focus solely on providing the JSON configuration!`;
+          }
         }
       } catch (e) {
         console.error('Search failed:', e);
       }
     }
 
-    if (message.startsWith('[Think:')) {
-      const query = message.replace(/^\[Think:\s*/, '').replace(/\]$/, '');
+    if (userQuery.startsWith('[Think:')) {
+      const query = userQuery.replace(/^\[Think:\s*/, '').replace(/\]$/, '');
       try {
         const searchResults = await performWebSearch(query);
 

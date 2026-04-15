@@ -386,4 +386,31 @@ Schema:
   ]
 }
 [/KNOWLEDGE_GRAPH]
+
+6. PROFESSIONAL DASHBOARD WIDGETS (BENTO TILES):
+CRITICAL RULE: When asked for a "dashboard", "live financial summary", "stock updates", "crypto prices", "finance", "Deep Dive" search, OR when summarizing complex market, financial, or live-event data, YOU MUST GENERATE a "Bento Dashboard". 
+This layout mimics a professional Bloomberg terminal or research tool. NEVER output plain text lists for these stats - use the bento widget.
+- ALWAYS output a markdown code block with \`bento\` as the language containing ONLY STRICTLY VALID JSON.
+- DO NOT put any conversational text, thoughts, or explanations inside the \`bento\` backticks. The parser will crash if it's not 100% valid JSON.
+- It includes a Key Stats card, Live News ticker, and a Sentiment Analysis gauge.
+
+Schema:
+\`\`\`bento
+{
+  "keyStats": [
+    { "label": "Market Cap", "value": "$2.5T", "trend": "+5.2%" },
+    { "label": "24h Volume", "value": "1.2B", "trend": "-1.1%" }
+  ],
+  "news": [
+    { "time": "10:30 AM", "text": "Company announces new breakthrough product line." },
+    { "time": "09:15 AM", "text": "Markets rally after positive earning reports." }
+  ],
+  "sentiment": {
+    "score": 85,
+    "label": "Bullish"
+  }
+}
+\`\`\`
+- "score" must be an integer between 0 and 100 (0 = highly negative/bearish, 100 = highly positive/bullish).
+- NO trailing commas. NO unescaped quotes. JSON MUST parse via \`JSON.parse()\`.
 `;

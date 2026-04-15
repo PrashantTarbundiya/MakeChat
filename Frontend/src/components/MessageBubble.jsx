@@ -20,6 +20,7 @@ import ReactPlayer from 'react-player';
 import L from 'leaflet';
 import { FileDownloadButton } from './FileDownloadButton';
 import { generateCSV, generateJSON, generateXML, generateText, generateHTML, generateMarkdown, generateYAML, generatePDF } from '../utils/fileGenerators';
+import { BentoDashboard } from './BentoDashboard';
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -290,11 +291,10 @@ const MathBlock = ({ math, inline = false }) => {
           font-size: 1.1em !important;
         }
       `}</style>
-      <div 
-        ref={containerRef} 
-        className={`my-6 overflow-x-auto py-4 text-xl sm:text-2xl ${
-          !inline ? 'flex justify-center bg-white/5 rounded-xl border border-white/10 shadow-lg' : ''
-        }`}
+      <div
+        ref={containerRef}
+        className={`my-6 overflow-x-auto py-4 text-xl sm:text-2xl ${!inline ? 'flex justify-center bg-white/5 rounded-xl border border-white/10 shadow-lg' : ''
+          }`}
       />
     </>
   );
@@ -302,7 +302,7 @@ const MathBlock = ({ math, inline = false }) => {
 
 /* Try to parse potentially-malformed JSON from LLM */
 const parseChartJSON = (raw) => {
-  try { return JSON.parse(raw); } catch {}
+  try { return JSON.parse(raw); } catch { }
 
   // Remove JS comments, trailing commas, unquoted keys
   let cleaned = raw
@@ -314,7 +314,7 @@ const parseChartJSON = (raw) => {
   // Normalize single quotes to double quotes
   cleaned = cleaned.replace(/'/g, '"');
 
-  try { return JSON.parse(cleaned); } catch {}
+  try { return JSON.parse(cleaned); } catch { }
   return null;
 };
 
@@ -605,7 +605,7 @@ const MermaidDiagram = ({ chart, onSendMessage }) => {
         <div className="px-4 py-2 text-yellow-500 text-[11px] font-medium border-b border-yellow-500/20 flex items-center justify-between">
           <span>⚠️ Diagram Syntax Failed</span>
           {onSendMessage ? (
-            <button 
+            <button
               onClick={() => onSendMessage("The Mermaid diagram you generated failed to render due to a syntax error. Please output ONLY the fully corrected mermaid diagram block with proper syntax. Use valid absolute dates for Gantts and valid node quotes.")}
               className="px-2 py-1 bg-yellow-500/20 hover:bg-yellow-500/30 rounded border border-yellow-500/30 text-[10px] transition-colors"
             >
@@ -623,13 +623,13 @@ const MermaidDiagram = ({ chart, onSendMessage }) => {
   return (
     <>
       <div className="relative group my-4">
-        <div 
+        <div
           onClick={() => setIsFullscreen(true)}
-          dangerouslySetInnerHTML={{ __html: svg }} 
-          className="flex justify-center bg-[#1e1e1e] p-4 rounded-lg border border-black/50 cursor-pointer hover:border-blue-500/50 transition-colors [&>svg]:max-w-full [&>svg]:h-auto" 
+          dangerouslySetInnerHTML={{ __html: svg }}
+          className="flex justify-center bg-[#1e1e1e] p-4 rounded-lg border border-black/50 cursor-pointer hover:border-blue-500/50 transition-colors [&>svg]:max-w-full [&>svg]:h-auto"
           title="Click to view full screen"
         />
-        <button 
+        <button
           onClick={() => setIsFullscreen(true)}
           className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded-md text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity backdrop-blur-sm flex items-center gap-1"
         >
@@ -640,20 +640,20 @@ const MermaidDiagram = ({ chart, onSendMessage }) => {
 
       <AnimatePresence>
         {isFullscreen && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[9999] bg-black/95 flex flex-col items-center justify-center p-1 sm:p-4 backdrop-blur-md"
             onClick={() => setIsFullscreen(false)}
           >
-            <button 
+            <button
               className="absolute top-2 right-2 sm:top-4 sm:right-4 p-1.5 sm:p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors z-[10000]"
               onClick={() => setIsFullscreen(false)}
             >
               <X className="w-6 h-6" />
             </button>
-            <div 
+            <div
               className={`w-full max-w-[100vw] sm:max-w-[95vw] h-[92vh] sm:h-[85vh] overflow-hidden p-2 sm:p-8 rounded-none sm:rounded-xl border-0 sm:border shadow-2xl relative transition-colors duration-300 ${isDarkTheme ? 'bg-[#1a1a1a] sm:border-white/10' : 'bg-white sm:border-gray-200'} ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
               onClick={e => e.stopPropagation()}
               onMouseDown={handleMouseDown}
@@ -665,10 +665,10 @@ const MermaidDiagram = ({ chart, onSendMessage }) => {
               onTouchEnd={handleTouchEnd}
               ref={containerRef}
             >
-              <div 
-                dangerouslySetInnerHTML={{ __html: svg }} 
+              <div
+                dangerouslySetInnerHTML={{ __html: svg }}
                 className="transition-all ease-out mx-auto [&>svg]:!w-full [&>svg]:!h-auto [&>svg]:!max-w-none select-none"
-                style={{ 
+                style={{
                   width: `${Math.max(10, zoom * 100)}%`,
                   minWidth: `${zoom * 300}px`,
                   transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
@@ -676,68 +676,68 @@ const MermaidDiagram = ({ chart, onSendMessage }) => {
                 }}
               />
             </div>
-            
+
             {/* Enhanced Toolbar */}
-            <div 
+            <div
               className="absolute bottom-3 sm:bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-0.5 sm:gap-1 bg-[#252525] border border-white/10 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full shadow-2xl z-[10000] max-w-[95vw] overflow-x-auto"
               onClick={e => e.stopPropagation()}
             >
               {/* Zoom controls */}
-              <button 
-                onClick={() => setZoom(z => Math.max(0.25, z - 0.25))} 
+              <button
+                onClick={() => setZoom(z => Math.max(0.25, z - 0.25))}
                 className="p-1.5 sm:p-2 hover:bg-blue-500/20 hover:text-blue-400 rounded-full text-gray-300 transition-colors flex-shrink-0"
                 title="Zoom Out"
               >
-                <ZoomOut className="w-3.5 sm:w-4 h-3.5 sm:h-4"/>
+                <ZoomOut className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
               </button>
               <span className="text-gray-200 text-[10px] sm:text-xs font-medium w-8 sm:w-10 text-center select-none flex-shrink-0">
                 {Math.round(zoom * 100)}%
               </span>
-              <button 
-                onClick={() => setZoom(z => Math.min(4, z + 0.25))} 
+              <button
+                onClick={() => setZoom(z => Math.min(4, z + 0.25))}
                 className="p-1.5 sm:p-2 hover:bg-blue-500/20 hover:text-blue-400 rounded-full text-gray-300 transition-colors flex-shrink-0"
                 title="Zoom In"
               >
-                <ZoomIn className="w-3.5 sm:w-4 h-3.5 sm:h-4"/>
+                <ZoomIn className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
               </button>
 
               <div className="w-px h-4 sm:h-5 bg-white/10 mx-0.5 sm:mx-1 flex-shrink-0" />
 
               {/* Fit to screen */}
-              <button 
+              <button
                 onClick={handleFitToScreen}
                 className="p-1.5 sm:p-2 hover:bg-emerald-500/20 hover:text-emerald-400 rounded-full text-gray-300 transition-colors flex-shrink-0"
                 title="Fit to Screen"
               >
-                <Maximize className="w-3.5 sm:w-4 h-3.5 sm:h-4"/>
+                <Maximize className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
               </button>
 
               {/* Theme toggle */}
-              <button 
+              <button
                 onClick={() => setIsDarkTheme(d => !d)}
                 className="p-1.5 sm:p-2 hover:bg-amber-500/20 hover:text-amber-400 rounded-full text-gray-300 transition-colors flex-shrink-0"
                 title={isDarkTheme ? 'Light Theme' : 'Dark Theme'}
               >
-                {isDarkTheme ? <Sun className="w-3.5 sm:w-4 h-3.5 sm:h-4"/> : <Moon className="w-3.5 sm:w-4 h-3.5 sm:h-4"/>}
+                {isDarkTheme ? <Sun className="w-3.5 sm:w-4 h-3.5 sm:h-4" /> : <Moon className="w-3.5 sm:w-4 h-3.5 sm:h-4" />}
               </button>
 
               <div className="w-px h-4 sm:h-5 bg-white/10 mx-0.5 sm:mx-1 flex-shrink-0" />
 
               {/* Export buttons */}
-              <button 
+              <button
                 onClick={handleExportPNG}
                 className="flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-1 sm:py-1.5 hover:bg-purple-500/20 hover:text-purple-400 rounded-full text-gray-300 transition-colors text-[10px] sm:text-xs font-medium flex-shrink-0"
                 title="Export as PNG"
               >
-                <Download className="w-3 sm:w-3.5 h-3 sm:h-3.5"/>
+                <Download className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
                 PNG
               </button>
-              <button 
+              <button
                 onClick={handleExportSVG}
                 className="flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-1 sm:py-1.5 hover:bg-purple-500/20 hover:text-purple-400 rounded-full text-gray-300 transition-colors text-[10px] sm:text-xs font-medium flex-shrink-0"
                 title="Export as SVG"
               >
-                <Download className="w-3 sm:w-3.5 h-3 sm:h-3.5"/>
+                <Download className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
                 SVG
               </button>
             </div>
@@ -803,7 +803,7 @@ export const MessageBubble = ({ content, role, versions, currentVersion, onVersi
         const rawGraph = JSON.parse(jsonStr);
         const nodes = rawGraph.nodes || [];
         const links = rawGraph.links || rawGraph.edges || [];
-        const palette = ['#8b5cf6','#06b6d4','#f59e0b','#ef4444','#10b981','#3b82f6','#ec4899','#6366f1','#14b8a6'];
+        const palette = ['#8b5cf6', '#06b6d4', '#f59e0b', '#ef4444', '#10b981', '#3b82f6', '#ec4899', '#6366f1', '#14b8a6'];
         const categories = Array.from(new Set(nodes.map(n => n.category || 0))).map(c => ({ name: String(c) }));
 
         // Convert to full ECharts graph option
@@ -862,31 +862,31 @@ export const MessageBubble = ({ content, role, versions, currentVersion, onVersi
   // Parse file download blocks
   const parseDownloadBlocks = (text) => {
     const downloads = [];
-    
+
     // New JSON Format: handles [FILE_DOWNLOAD:{...}] or hallucinated ones like [DOCX_FILE_DOWNLOAD:{...}]
     // Updated regex to handle multiline JSON and complex nested objects
     const jsonRegex = /\[(?:[A-Z_]*)?DOWNLOAD:\s*(\{[\s\S]*?\})\s*\]/gi;
     let match;
     let lastIndex = 0;
-    
+
     while ((match = jsonRegex.exec(text)) !== null) {
       try {
         const jsonStr = match[1].trim();
         // Try to parse JSON - handle potential errors gracefully
         const parsed = JSON.parse(jsonStr);
-        
+
         // Validate that required fields exist
         if (parsed.filename && (parsed.url || parsed.content || parsed.data || parsed.base64)) {
           downloads.push(parsed);
         }
       } catch (e) {
-        
+
         // Fallback: try to extract values if JSON parsing fails
         try {
           const urlMatch = /["']?url["']?\s*:\s*["']([^"']+)["']/i.exec(match[1]);
           const filenameMatch = /["']?filename["']?\s*:\s*["']([^"']+)["']/i.exec(match[1]);
           const typeMatch = /["']?type["']?\s*:\s*["']([^"']+)["']/i.exec(match[1]);
-          
+
           if (urlMatch && filenameMatch) {
             downloads.push({
               filename: filenameMatch[1],
@@ -905,7 +905,7 @@ export const MessageBubble = ({ content, role, versions, currentVersion, onVersi
     while ((match = legacyRegex.exec(text)) !== null) {
       // Skip if this was already matched by JSON regex
       if (text.substring(match.index, match.index + match[0].length).includes('{')) continue;
-      
+
       const params = match[1];
       const parsed = {};
       params.split(',').forEach(part => {
@@ -916,7 +916,7 @@ export const MessageBubble = ({ content, role, versions, currentVersion, onVersi
         downloads.push(parsed);
       }
     }
-    
+
     return downloads;
   };
 
@@ -1033,7 +1033,7 @@ export const MessageBubble = ({ content, role, versions, currentVersion, onVersi
         <div className="flex flex-col gap-4 mb-4">
           {videos.map((vid, idx) => (
             <div key={idx} className="rounded-xl overflow-hidden shadow-lg border border-gray-600 bg-black aspect-video w-full max-w-3xl">
-               <ReactPlayer url={vid} width="100%" height="100%" controls />
+              <ReactPlayer url={vid} width="100%" height="100%" controls />
             </div>
           ))}
         </div>
@@ -1091,11 +1091,15 @@ export const MessageBubble = ({ content, role, versions, currentVersion, onVersi
                   if (parsed && typeof parsed === 'object' && 'lat' in parsed && 'lng' in parsed && 'zoom' in parsed) {
                     return <MapEmbedRenderer jsonString={codeString} />;
                   }
-                } catch (e) {}
+                } catch (e) { }
+              }
+
+              if (match && match[1].toLowerCase() === 'bento') {
+                return <BentoDashboard dataString={codeString} />;
               }
 
               const language = match ? match[1].toLowerCase() : '';
-              
+
               // 3D detection: explicitly tagged as '3d' always renders.
               // For html/js/untagged blocks, require BOTH a Three.js signature AND
               // structural markers (importmap, DOCTYPE, or full HTML) to avoid
@@ -1103,9 +1107,9 @@ export const MessageBubble = ({ content, role, versions, currentVersion, onVersi
               const hasThreeSignature = codeString.includes('THREE.Scene') || codeString.includes('OrbitControls') || codeString.includes('THREE.PerspectiveCamera');
               const hasStructuralMarker = codeString.includes('importmap') || codeString.includes('<!DOCTYPE') || codeString.includes('<html');
               const isSubstantial = codeString.length > 200; // Reject tiny broken fragments
-              
-              if (language === '3d' || 
-                 ((language === 'html' || language === 'javascript' || !language) && 
+
+              if (language === '3d' ||
+                ((language === 'html' || language === 'javascript' || !language) &&
                   hasThreeSignature && hasStructuralMarker && isSubstantial)) {
                 return <ThreeView data={codeString} />;
               }
@@ -1237,13 +1241,13 @@ export const MessageBubble = ({ content, role, versions, currentVersion, onVersi
                       try {
                         // Always proxy the download to bypass CORS restrictions entirely
                         const fetchUrl = `${import.meta.env.VITE_API_URL}/api/upload/proxy?url=${encodeURIComponent(src)}`;
-                          
+
                         const response = await fetch(fetchUrl);
                         if (!response.ok) throw new Error('Fetch failed');
-                        
+
                         const blob = await response.blob();
                         const blobUrl = URL.createObjectURL(blob);
-                        
+
                         const a = document.createElement('a');
                         a.href = blobUrl;
                         // Extract filename from URL or default to image.png
@@ -1251,7 +1255,7 @@ export const MessageBubble = ({ content, role, versions, currentVersion, onVersi
                         const pathname = urlObj.pathname;
                         const defaultFilename = pathname.substring(pathname.lastIndexOf('/') + 1) || 'image.png';
                         a.download = defaultFilename;
-                        
+
                         document.body.appendChild(a);
                         a.click();
                         document.body.removeChild(a);
