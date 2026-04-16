@@ -27,11 +27,9 @@ const MODELS = {
   'gpt-oss': 'openai/gpt-oss-120b',
   'llama-maverick': 'meta-llama/llama-4-scout-17b-16e-instruct',
   'llama-scout': 'meta-llama/llama-4-scout-17b-16e-instruct',
-  'kimi': 'moonshotai/kimi-k2-instruct-0905',
+  'nemotron-super': 'nvidia/nemotron-3-super-120b-a12b:free',
   'gemini-pro': 'gemini-pro',
-  'grok-fast': 'x-ai/grok-4.1-fast:free',
   'deepseek': 'deepseek/deepseek-v3.2',
-  'step-3.5-flash': 'stepfun/step-3.5-flash:free',
   'qwen-32b': 'qwen/qwen3-32b',
   'claude-opus': 'anthropic/claude-opus-4-5',
   'llm-council': 'council',
@@ -41,7 +39,7 @@ const MODELS = {
   'bytez-music': 'facebook/musicgen-stereo-small'
 };
 
-const COUNCIL_MODELS = ['grok-fast', 'gemini-pro', 'gpt-oss', 'kimi'];
+const COUNCIL_MODELS = ['qwen-32b', 'gemini-pro', 'gpt-oss', 'claude-opus'];
 const CHAIRMAN_MODEL = 'deepseek/deepseek-v3.2';
 
 router.post('/chat', upload.array('files'), async (req, res) => {
@@ -334,7 +332,7 @@ USER REQUEST: ${userMessage}`;
             systemInstruction: systemPrompt
           });
           response = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        } else if (councilModel === 'grok-fast') {
+        } else if (['gpt-oss', 'qwen-32b', 'claude-opus'].includes(councilModel)) {
           const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`, 'Content-Type': 'application/json' },
@@ -380,11 +378,15 @@ USER REQUEST: ${userMessage}`;
         if (debater.model === 'gemini-pro') {
           const result = await genAI.models.generateContent({ model: 'gemini-2.5-flash', contents: [{ role: 'user', parts: [{ text: debatePrompt }] }] });
           debate = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        } else if (debater.model === 'grok-fast') {
+        } else if (['gpt-oss', 'qwen-32b', 'claude-opus', 'nemotron-super'].includes(debater.model)) {
           const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: MODELS[debater.model], messages: [{ role: 'user', content: debatePrompt }] })
+            body: JSON.stringify({ 
+              model: MODELS[debater.model], 
+              messages: [{ role: 'user', content: debatePrompt }],
+              ...(debater.model === 'nemotron-super' ? { reasoning: { enabled: true } } : {})
+            })
           });
           const data = await resp.json();
           debate = data.choices?.[0]?.message?.content || '';
@@ -501,7 +503,7 @@ USER REQUEST: ${userMessage}`;
       }
     }
     // Handle OpenRouter text models
-    else if (['grok-fast', 'deepseek', 'step-3.5-flash'].includes(model)) {
+    else if (['gpt-oss', 'qwen-32b', 'claude-opus', 'deepseek', 'nemotron-super'].includes(model)) {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -514,6 +516,7 @@ USER REQUEST: ${userMessage}`;
             if (typeof m.content === 'string') return { role: m.role, content: m.content };
             return { role: m.role, content: m.content }; // Pass multimodal array exactly as is
           }),
+          ...(model === 'nemotron-super' ? { reasoning: { enabled: true } } : {}),
           stream: true
         })
       });

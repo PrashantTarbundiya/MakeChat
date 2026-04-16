@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { X, LogOut, Trash2, BarChart3, Brain, Settings2, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -6,11 +6,9 @@ const MODEL_LABELS = {
   'llama-maverick': { name: 'Llama Maverick', emoji: '🦙' },
   'gpt-oss': { name: 'GPT OSS', emoji: '🤖' },
   'llama-scout': { name: 'Llama Scout', emoji: '🦙' },
-  'kimi': { name: 'Kimi', emoji: '🌙' },
+  'nemotron-super': { name: 'Nemotron 120B', emoji: '🟩' },
   'gemini-pro': { name: 'Gemini Pro', emoji: '♊' },
-  'grok-fast': { name: 'Grok 4.1 Fast', emoji: '⚡' },
   'deepseek': { name: 'DeepSeek V3.2', emoji: '🔍' },
-  'step-3.5-flash': { name: 'Step 3.5 Flash', emoji: '💫' },
   'qwen-32b': { name: 'Qwen 32B', emoji: '🧠' },
   'claude-opus': { name: 'Claude Opus 4.5', emoji: '🎵' },
   'llm-council': { name: 'LLM Council', emoji: '🏛️' },
@@ -186,7 +184,7 @@ export const Settings = ({ user, isOpen, setIsOpen, onLogout }) => {
   if (usageStats?.stats) {
     Object.entries(usageStats.stats).forEach(([modelId, data]) => {
       if (!allModelsStats[modelId]) {
-        allModelsStats[modelId] = { name: modelId, emoji: '🤖', count: 0, lastUsed: null };
+        allModelsStats[modelId] = { name: modelId, emoji: 'ðŸ¤–', count: 0, lastUsed: null };
       }
       allModelsStats[modelId].count = data.count;
       allModelsStats[modelId].lastUsed = data.lastUsed;
@@ -250,10 +248,10 @@ export const Settings = ({ user, isOpen, setIsOpen, onLogout }) => {
               </button>
             </div>
 
-            {/* Two-Column Layout — Left sticky, Right scrolls */}
+            {/* Two-Column Layout â€” Left sticky, Right scrolls */}
             <div className="flex-1 overflow-hidden flex flex-col md:flex-row gap-6 px-6 sm:px-8 pb-6 sm:pb-8">
 
-                {/* Left Column — Sticky sidebar */}
+                {/* Left Column â€” Sticky sidebar */}
                 <div className="flex flex-col gap-4 md:w-[280px] md:flex-shrink-0">
                   {/* Profile Card */}
                   <div className="p-5 bg-[#111215] border border-white/[0.06] rounded-2xl flex items-center gap-4">
@@ -300,7 +298,7 @@ export const Settings = ({ user, isOpen, setIsOpen, onLogout }) => {
                   </motion.button>
                 </div>
 
-                {/* Right Column — Scrollable Content */}
+                {/* Right Column â€” Scrollable Content */}
                 <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent pr-1">
                   {/* Memory Tab */}
                   {activeTab === 'memory' && (
@@ -313,7 +311,7 @@ export const Settings = ({ user, isOpen, setIsOpen, onLogout }) => {
 
                       <p className="text-gray-500 text-sm mb-5 leading-relaxed">AI uses saved memories to personalize responses for you.</p>
                       
-                      {/* Add Memory — at top for quick access */}
+                      {/* Add Memory â€” at top for quick access */}
                       <div className="flex gap-3 mb-5">
                         <input
                           value={newMemory}
@@ -415,7 +413,7 @@ export const Settings = ({ user, isOpen, setIsOpen, onLogout }) => {
                       ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                           {sortedStats.map(([modelId, data], index) => {
-                            const label = MODEL_LABELS[modelId] || { name: modelId, emoji: '🤖' };
+                            const label = MODEL_LABELS[modelId] || { name: modelId, emoji: 'ðŸ¤–' };
                             const percentage = maxCount > 0 ? (data.count / maxCount) * 100 : 0;
                             const barColors = [
                               'from-emerald-500 to-emerald-400',
