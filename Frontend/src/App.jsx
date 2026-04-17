@@ -23,6 +23,7 @@ function App({ user, isShared = false }) {
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState([]);
   const [currentResponse, setCurrentResponse] = useState('');
+  const [currentThinking, setCurrentThinking] = useState('');
   const [selectedModel, setSelectedModel] = useState('llama-maverick');
   const [editingIndex, setEditingIndex] = useState(null);
   const [editText, setEditText] = useState('');
@@ -30,7 +31,6 @@ function App({ user, isShared = false }) {
   const [currentChatId, setCurrentChatId] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 1024);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [thinkingPanel, setThinkingPanel] = useState(null);
   const [loadingState, setLoadingState] = useState('');
   const [shareToken, setShareToken] = useState(null);
   const [isForked, setIsForked] = useState(false);
@@ -43,6 +43,7 @@ function App({ user, isShared = false }) {
   const [backgroundGenerations, setBackgroundGenerations] = useState(new Set());
   const backgroundChatMessagesRef = useRef(new Map());
   const backgroundCurrentResponseRef = useRef(new Map());
+  const backgroundCurrentThinkingRef = useRef(new Map());
   const pendingNewChatRef = useRef(false);
 
   const handleScrollToMessage = (index) => {
@@ -89,6 +90,7 @@ function App({ user, isShared = false }) {
     setSelectedModel(model);
     setIsLoading(true);
     setCurrentResponse('');
+    setCurrentThinking('');
 
     // Auto-detect mode from message content
     let isSearch = message.startsWith('[Search:');
@@ -212,12 +214,14 @@ function App({ user, isShared = false }) {
           console.error('Failed to create chat');
           setIsLoading(false);
           setCurrentResponse('');
+          setCurrentThinking('');
           return;
         }
       } catch (error) {
         console.error('Failed to save initial message:', error);
         setIsLoading(false);
         setCurrentResponse('');
+        setCurrentThinking('');
         return;
       }
     }
@@ -291,9 +295,19 @@ function App({ user, isShared = false }) {
                 fullResponse += parsed.content;
               }
               const displayResponse = fullResponse.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/<think>[\s\S]*$/g, '');
+              let currentThinkingText = thinkingText;
+              
+              // Also extract <think> blocks streaming in fullResponse
+              const thinkMatches = [...fullResponse.matchAll(/<think>([\s\S]*?)(?:<\/think>|$)/g)];
+              if (thinkMatches.length > 0) {
+                currentThinkingText += (currentThinkingText ? '\n\n' : '') + thinkMatches.map(m => m[1].trim()).join('\n\n');
+              }
+              
               backgroundCurrentResponseRef.current.set(requestChatId, displayResponse);
+              backgroundCurrentThinkingRef.current.set(requestChatId, currentThinkingText);
               if (activeChatIdRef.current === requestChatId) {
                 setCurrentResponse(displayResponse);
+                setCurrentThinking(currentThinkingText);
               }
             } catch (e) { }
           }
@@ -306,10 +320,14 @@ function App({ user, isShared = false }) {
       // Extract ALL <think> blocks (global, handles multiple)
       const thinkMatches = [...cleanResponse.matchAll(/<think>([\s\S]*?)<\/think>/g)];
       if (thinkMatches.length > 0) {
-        extractedThinking = thinkMatches.map(m => m[1].trim()).join('\n\n');
+        extractedThinking += (extractedThinking ? '\n\n' : '') + thinkMatches.map(m => m[1].trim()).join('\n\n');
         cleanResponse = cleanResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
       }
       // Also strip any unclosed <think> tag at the end (model didn't finish closing it)
+      const pendingThink = cleanResponse.match(/<think>([\s\S]*)$/);
+      if (pendingThink) {
+        extractedThinking += (extractedThinking ? '\n\n' : '') + pendingThink[1].trim();
+      }
       cleanResponse = cleanResponse.replace(/<think>[\s\S]*$/g, '').trim();
 
       // Store thinking if present
@@ -338,19 +356,23 @@ function App({ user, isShared = false }) {
       }
 
       setCurrentResponse('');
+      setCurrentThinking('');
     } catch (error) {
       if (error.name === 'AbortError') {
         // Only append partial message if manually stopped
         const isNavigation = abortControllerRef.current?.signal?.reason === 'navigation';
-        if (!isNavigation && currentResponse) {
-          const cleanResponse = currentResponse.replace(/<\d+\/\d+>/g, '').trim();
+        const partialResponse = (backgroundCurrentResponseRef.current.get(requestChatId) || '').replace(/<\d+\/\d+>/g, '').trim();
+        const partialThinking = (backgroundCurrentThinkingRef.current.get(requestChatId) || '').trim();
+        if (!isNavigation && (partialResponse || partialThinking)) {
           // If still active, show stopped message. If background, maybe save partial? For simplicity, treat same: if active, update UI; else save background.
           const partialMsg = {
             role: 'assistant',
-            content: cleanResponse + ' [Stopped]',
+            content: (partialResponse ? `${partialResponse} [Stopped]` : '[Stopped]'),
             model,
-            versions: [cleanResponse + ' [Stopped]'],
-            currentVersion: 0
+            thinking: partialThinking || undefined,
+            versions: [(partialResponse ? `${partialResponse} [Stopped]` : '[Stopped]')],
+            currentVersion: 0,
+            mode: isSearch ? 'search' : isThink ? 'think' : isCanvas ? 'canvas' : 'normal'
           };
           if (activeChatIdRef.current === requestChatId) {
             setMessages(prev => [...prev, partialMsg]);
@@ -362,6 +384,7 @@ function App({ user, isShared = false }) {
           }
         }
         setCurrentResponse('');
+        setCurrentThinking('');
       } else {
         console.error('Error:', error);
       }
@@ -374,6 +397,7 @@ function App({ user, isShared = false }) {
       // Cleanup background tracking
       backgroundChatMessagesRef.current.delete(requestChatId);
       backgroundCurrentResponseRef.current.delete(requestChatId);
+      backgroundCurrentThinkingRef.current.delete(requestChatId);
       setBackgroundGenerations(prev => {
         const newSet = new Set(prev);
         newSet.delete(requestChatId);
@@ -431,6 +455,7 @@ function App({ user, isShared = false }) {
       // Call the API directly without adding user message
       setIsLoading(true);
       setCurrentResponse('');
+      setCurrentThinking('');
       abortControllerRef.current = new AbortController();
 
       try {
@@ -478,9 +503,18 @@ function App({ user, isShared = false }) {
                   fullResponse += parsed.content;
                 }
                 const displayResponse = fullResponse.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/<think>[\s\S]*$/g, '');
+                let currentThinkingText = thinkingText;
+
+                const thinkMatches = [...fullResponse.matchAll(/<think>([\s\S]*?)(?:<\/think>|$)/g)];
+                if (thinkMatches.length > 0) {
+                  currentThinkingText += (currentThinkingText ? '\n\n' : '') + thinkMatches.map(m => m[1].trim()).join('\n\n');
+                }
+
                 backgroundCurrentResponseRef.current.set(requestChatId, displayResponse);
+                backgroundCurrentThinkingRef.current.set(requestChatId, currentThinkingText);
                 if (activeChatIdRef.current === requestChatId) {
                   setCurrentResponse(displayResponse);
+                  setCurrentThinking(currentThinkingText);
                 }
               } catch (e) { }
             }
@@ -492,8 +526,12 @@ function App({ user, isShared = false }) {
 
         const thinkMatches = [...cleanResponse.matchAll(/<think>([\s\S]*?)<\/think>/g)];
         if (thinkMatches.length > 0) {
-          extractedThinking = thinkMatches.map(m => m[1].trim()).join('\n\n');
+          extractedThinking += (extractedThinking ? '\n\n' : '') + thinkMatches.map(m => m[1].trim()).join('\n\n');
           cleanResponse = cleanResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+        }
+        const pendingThink = cleanResponse.match(/<think>([\s\S]*)$/);
+        if (pendingThink) {
+          extractedThinking += (extractedThinking ? '\n\n' : '') + pendingThink[1].trim();
         }
         cleanResponse = cleanResponse.replace(/<think>[\s\S]*$/g, '').trim();
 
@@ -524,16 +562,20 @@ function App({ user, isShared = false }) {
         }
 
         setCurrentResponse('');
+        setCurrentThinking('');
       } catch (error) {
         if (error.name === 'AbortError') {
           // Only append partial message if manually stopped
-          if (currentResponse) {
-            const cleanResponse = currentResponse.replace(/<\d+\/\d+>/g, '').trim();
+          const partialResponse = (backgroundCurrentResponseRef.current.get(requestChatId) || '').replace(/<\d+\/\d+>/g, '').trim();
+          const partialThinking = (backgroundCurrentThinkingRef.current.get(requestChatId) || '').trim();
+          if (partialResponse || partialThinking) {
             const partialMsg = {
               role: 'assistant',
-              content: cleanResponse + ' [Stopped]',
+              content: (partialResponse ? `${partialResponse} [Stopped]` : '[Stopped]'),
               model: lastAssistantMsg.model || selectedModel,
-              versions: [cleanResponse + ' [Stopped]'],
+              thinking: partialThinking || undefined,
+              mode: lastAssistantMsg.mode || 'normal',
+              versions: [(partialResponse ? `${partialResponse} [Stopped]` : '[Stopped]')],
               currentVersion: 0
             };
             if (activeChatIdRef.current === requestChatId) {
@@ -546,6 +588,7 @@ function App({ user, isShared = false }) {
             }
           }
           setCurrentResponse('');
+          setCurrentThinking('');
         } else {
           console.error('Error:', error);
         }
@@ -557,6 +600,8 @@ function App({ user, isShared = false }) {
         }
         // Cleanup background tracking
         backgroundChatMessagesRef.current.delete(requestChatId);
+        backgroundCurrentResponseRef.current.delete(requestChatId);
+        backgroundCurrentThinkingRef.current.delete(requestChatId);
         setBackgroundGenerations(prev => {
           const newSet = new Set(prev);
           newSet.delete(requestChatId);
@@ -619,9 +664,9 @@ function App({ user, isShared = false }) {
     setIsLoading(false);
     setMessages([]);
     setCurrentResponse('');
+    setCurrentThinking('');
     activeChatIdRef.current = null; // Update ref immediately to avoid race condition
     setCurrentChatId(null);
-    setThinkingPanel(null);
   };
 
   const handleSelectChat = async (chatId) => {
@@ -630,15 +675,16 @@ function App({ user, isShared = false }) {
 
     setIsLoading(false);
     setCurrentResponse('');
+    setCurrentThinking('');
 
     const specialModels = ['bytez-image', 'bytez-video', 'bytez-audio', 'bytez-music', 'llm-council'];
     if (specialModels.includes(chatId)) {
       // For special models, just clear the chat without authentication check
       setMessages([]);
       setCurrentResponse('');
+      setCurrentThinking('');
       activeChatIdRef.current = null;
       setCurrentChatId(null);
-      setThinkingPanel(null);
       setSelectedModel(chatId);
       return;
     }
@@ -652,7 +698,6 @@ function App({ user, isShared = false }) {
       window.dispatchEvent(new CustomEvent('inject-prompt', { detail: prefix }));
       return;
     }
-    setThinkingPanel(null);
     // Immediately set active chat ref to avoid race conditions with background generation
     activeChatIdRef.current = chatId;
     try {
@@ -685,6 +730,9 @@ function App({ user, isShared = false }) {
           setIsLoading(true);
           setLoadingState('✨ Generating response...');
           setCurrentResponse(backgroundCurrentResponseRef.current.get(chatId) || '');
+          setCurrentThinking(backgroundCurrentThinkingRef.current.get(chatId) || '');
+        } else {
+          setCurrentThinking('');
         }
       } else {
         toast.remove();
@@ -871,9 +919,9 @@ function App({ user, isShared = false }) {
         setIsOpen={setSidebarOpen}
         onOpenSettings={() => setSettingsOpen(true)}
       />
-      <div className={`flex flex-col flex-1 transition-all duration-300 ${sidebarOpen ? 'lg:ml-64' : 'ml-0'} ${thinkingPanel !== null ? 'lg:mr-[300px]' : ''} h-screen`}>
+      <div className={`flex flex-col flex-1 transition-all duration-300 ${sidebarOpen ? 'lg:ml-64' : 'ml-0'} h-screen`}>
         <div className="flex-1 overflow-y-auto p-2 sm:p-4 pt-[70px] md:pt-[80px] pb-[120px] md:pb-[140px] scrollbar-thin scrollbar-thumb-black scrollbar-track-black">
-          <div className={`mx-auto space-y-4 w-full transition-all duration-300 ${thinkingPanel !== null ? 'max-w-[700px]' : 'max-w-[800px]'}`}>
+          <div className="mx-auto space-y-4 w-full transition-all duration-300 max-w-[800px]">
             {messages.length === 0 && !isLoading && (
               <div className="flex flex-col items-center justify-center min-h-[50vh] px-4 relative z-10 w-full">
                 {/* Background ambient glow - scaled down */}
@@ -970,30 +1018,35 @@ function App({ user, isShared = false }) {
                             }
                           }}
                         />
-                      ) : msg.role === 'assistant' && msg.mode === 'canvas' ? (
-                        <CanvasView content={msg.content} />
-                      ) : msg.role === 'assistant' && msg.mode === 'think' ? (
-                        <ThinkingView content={msg.content} />
-                      ) : msg.role === 'assistant' && msg.mode === 'search' ? (
-                        <SearchView content={msg.content} />
+                      ) : msg.role === 'assistant' ? (
+                        <div className="flex flex-col gap-2 w-full">
+                          {msg.thinking && (
+                            <ThinkingView content={msg.thinking} isLoading={false} />
+                          )}
+                          {msg.mode === 'canvas' ? (
+                            <CanvasView content={msg.content} />
+                          ) : msg.mode === 'search' ? (
+                            <SearchView content={msg.content} />
+                          ) : (msg.content || !msg.thinking) ? (
+                            <MessageBubble
+                              content={msg.content}
+                              role={msg.role}
+                              versions={msg.versions}
+                              currentVersion={msg.currentVersion || 0}
+                              onVersionChange={(v) => handleVersionChange(i, v)}
+                              onSendMessage={(text) => handleSendMessage(text, [], selectedModel)}
+                            />
+                          ) : null}
+                        </div>
                       ) : (
-                        <MessageBubble
-                          content={msg.content}
-                          role={msg.role}
-                          versions={msg.versions}
-                          currentVersion={msg.currentVersion || 0}
-                          onVersionChange={(v) => handleVersionChange(i, v)}
-                          onSendMessage={(text) => handleSendMessage(text, [], selectedModel)}
-
-                        />
-                      )}
-                      {msg.thinking && msg.role === 'assistant' && editingIndex !== i && (
-                        <button
-                          onClick={() => setThinkingPanel(thinkingPanel === i ? null : i)}
-                          className="mt-2 px-3 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-sm text-white"
-                        >
-                          💭 Thinking
-                        </button>
+                         <MessageBubble
+                            content={msg.content}
+                            role={msg.role}
+                            versions={msg.versions}
+                            currentVersion={msg.currentVersion || 0}
+                            onVersionChange={(v) => handleVersionChange(i, v)}
+                            onSendMessage={(text) => handleSendMessage(text, [], selectedModel)}
+                          />
                       )}
                     </div>
                   </div>
@@ -1043,26 +1096,31 @@ function App({ user, isShared = false }) {
                 )}
               </div>
             )}
-            {currentResponse && !currentResponse.includes('media-container') && (
-              <div className="flex justify-start">
-                <div className="max-w-[95%]">
-                  {messages[messages.length - 1]?.mode === 'canvas' ? (
-                    <MessageBubble content={currentResponse} role="assistant" />
-                  ) : messages[messages.length - 1]?.mode === 'think' ? (
-                    <ThinkingView content={currentResponse} isLoading={true} />
-                  ) : messages[messages.length - 1]?.mode === 'search' ? (
-                    <SearchView content={currentResponse} isLoading={true} />
-                  ) : (
-                    <MessageBubble content={currentResponse} role="assistant" />
-                  )}
-                </div>
+            {(currentThinking || (currentResponse && !currentResponse.includes('media-container'))) && (
+              <div className="flex justify-start flex-col gap-2 w-full">
+                {currentThinking && (
+                  <div className="max-w-[95%]">
+                    <ThinkingView content={currentThinking} isLoading={true} />
+                  </div>
+                )}
+                {currentResponse && !currentResponse.includes('media-container') && (
+                  <div className="max-w-[95%]">
+                    {messages[messages.length - 1]?.mode === 'canvas' ? (
+                      <MessageBubble content={currentResponse} role="assistant" />
+                    ) : messages[messages.length - 1]?.mode === 'search' ? (
+                      <SearchView content={currentResponse} isLoading={true} />
+                    ) : (
+                      <MessageBubble content={currentResponse} role="assistant" />
+                    )}
+                  </div>
+                )}
               </div>
             )}
             <div ref={messagesEndRef} />
           </div>
         </div>
-        <div className={`fixed bottom-0 left-0 right-0 p-2 sm:p-3 bg-gradient-to-t from-black via-black/95 to-transparent backdrop-blur-sm ${sidebarOpen ? 'lg:left-64' : 'left-0'} ${thinkingPanel !== null ? 'lg:right-[300px]' : 'right-0'} z-10 pb-safe`}>
-          <div className={`w-full mx-auto ${thinkingPanel !== null ? 'max-w-[700px]' : 'max-w-[800px]'}`}>
+        <div className={`fixed bottom-0 left-0 right-0 p-2 sm:p-3 bg-gradient-to-t from-black via-black/95 to-transparent backdrop-blur-sm ${sidebarOpen ? 'lg:left-64' : 'left-0'} z-10 pb-safe`}>
+          <div className="w-full mx-auto max-w-[800px]">
             <PromptInputBox
               onSend={handleSendMessage}
               isLoading={isLoading}
@@ -1073,36 +1131,6 @@ function App({ user, isShared = false }) {
           </div>
         </div>
       </div>
-      {thinkingPanel !== null && messages[thinkingPanel]?.thinking && (
-        <>
-          <div className="fixed right-0 top-0 h-full w-full sm:w-[300px] bg-black border-l border-white/10 shadow-2xl z-50 flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-white/10">
-              <h3 className="text-white font-semibold flex items-center gap-2">
-                <span>💭</span> Thinking Process
-              </h3>
-              <button
-                onClick={() => setThinkingPanel(null)}
-                className="text-white hover:bg-white/10 rounded p-1"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M18 6L6 18M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              <div className="text-white whitespace-pre-wrap text-sm leading-relaxed">
-                {messages[thinkingPanel].thinking}
-              </div>
-            </div>
-          </div>
-          {window.innerWidth < 640 && (
-            <div
-              onClick={() => setThinkingPanel(null)}
-              className="fixed inset-0 bg-black/50 z-40"
-            />
-          )}
-        </>
-      )}
       <QueryOutline messages={messages} onScrollTo={handleScrollToMessage} />
       <Settings user={user} isOpen={settingsOpen} setIsOpen={setSettingsOpen} onLogout={handleLogout} />
 
