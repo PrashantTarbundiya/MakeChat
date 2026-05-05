@@ -568,7 +568,10 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
       else if (showThink) messagePrefix = "[Think: ";
       else if (showCanvas) messagePrefix = "[Canvas: ";
 
-      const formattedInput = messagePrefix ? `${messagePrefix}${input}]` : input;
+      const formattedInput = messagePrefix
+        ? `${messagePrefix}${input}]`
+        : input;
+
       onSend(formattedInput, files, selectedModel);
       setInput("");
       setFiles([]);
@@ -586,6 +589,7 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
   };
 
   const hasContent = input.trim() !== "" || files.length > 0;
+
 
   return (
     <>
@@ -683,6 +687,8 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
             onStopRecording={handleStopRecording}
           />
         )}
+
+
 
         <PromptInputActions className="flex items-center justify-between gap-2 p-0 pt-2">
           <div
@@ -864,6 +870,8 @@ export const PromptInputBox = React.forwardRef((props, ref) => {
               </button>
             </div>
           </div>
+
+
 
           <PromptInputAction
             tooltip={

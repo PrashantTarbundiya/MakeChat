@@ -1,3 +1,4 @@
+import React from "react";
 import { PromptInputBox } from "@/components/ui/ai-prompt-box";
 import { MessageBubble } from "@/components/MessageBubble";
 import { MessageActions } from "@/components/MessageActions";
@@ -983,52 +984,65 @@ function App({ user, isShared = false }) {
             {messages.map((msg, i) => {
               const isLastAssistant = msg.role === 'assistant' && i === messages.length - 1;
               const isLastUser = msg.role === 'user' && i === messages.length - 1;
+              // Show a divider AFTER each assistant message (end of exchange), except after the last one
+              const isEndOfExchange = msg.role === 'assistant' && i < messages.length - 1;
 
               return (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="group transition-all duration-500"
-                  ref={(el) => {
-                    messageRefs.current[i] = el;
-                    if (isLastUser) lastUserMessageRef.current = el;
-                  }}
-                >
-                  <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`space-y-2 ${msg.role === 'user' ? 'max-w-[80%]' : msg.mode === 'canvas' ? 'w-full' : 'max-w-[95%]'}`}>
-                      {editingIndex === i ? (
-                        <EditMessage
-                          value={editText}
-                          onChange={setEditText}
-                          onSave={() => handleSaveEdit(i)}
-                          onCancel={() => setEditingIndex(null)}
-                          role={msg.role}
-                          onRemoveFile={async () => {
-                            if (msg.filePublicId) {
-                              try {
-                                await fetch(`${import.meta.env.VITE_API_URL}/api/upload/delete`, {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ publicId: msg.filePublicId })
-                                });
-                              } catch (e) {
-                                console.error('Failed to delete file:', e);
+                <React.Fragment key={i}>
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="group transition-all duration-500"
+                    ref={(el) => {
+                      messageRefs.current[i] = el;
+                      if (isLastUser) lastUserMessageRef.current = el;
+                    }}
+                  >
+                    <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`space-y-2 ${msg.role === 'user' ? 'max-w-[80%]' : msg.mode === 'canvas' ? 'w-full' : 'max-w-[95%]'}`}>
+                        {editingIndex === i ? (
+                          <EditMessage
+                            value={editText}
+                            onChange={setEditText}
+                            onSave={() => handleSaveEdit(i)}
+                            onCancel={() => setEditingIndex(null)}
+                            role={msg.role}
+                            onRemoveFile={async () => {
+                              if (msg.filePublicId) {
+                                try {
+                                  await fetch(`${import.meta.env.VITE_API_URL}/api/upload/delete`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ publicId: msg.filePublicId })
+                                  });
+                                } catch (e) {
+                                  console.error('Failed to delete file:', e);
+                                }
                               }
-                            }
-                          }}
-                        />
-                      ) : msg.role === 'assistant' ? (
-                        <div className="flex flex-col gap-2 w-full">
-                          {msg.thinking && (
-                            <ThinkingView content={msg.thinking} isLoading={false} />
-                          )}
-                          {msg.mode === 'canvas' ? (
-                            <CanvasView content={msg.content} />
-                          ) : msg.mode === 'search' ? (
-                            <SearchView content={msg.content} />
-                          ) : (msg.content || !msg.thinking) ? (
-                            <MessageBubble
+                            }}
+                          />
+                        ) : msg.role === 'assistant' ? (
+                          <div className="flex flex-col gap-2 w-full">
+                            {msg.thinking && (
+                              <ThinkingView content={msg.thinking} isLoading={false} />
+                            )}
+                            {msg.mode === 'canvas' ? (
+                              <CanvasView content={msg.content} />
+                            ) : msg.mode === 'search' ? (
+                              <SearchView content={msg.content} />
+                            ) : (msg.content || !msg.thinking) ? (
+                              <MessageBubble
+                                content={msg.content}
+                                role={msg.role}
+                                versions={msg.versions}
+                                currentVersion={msg.currentVersion || 0}
+                                onVersionChange={(v) => handleVersionChange(i, v)}
+                                onSendMessage={(text) => handleSendMessage(text, [], selectedModel)}
+                              />
+                            ) : null}
+                          </div>
+                        ) : (
+                           <MessageBubble
                               content={msg.content}
                               role={msg.role}
                               versions={msg.versions}
@@ -1036,35 +1050,35 @@ function App({ user, isShared = false }) {
                               onVersionChange={(v) => handleVersionChange(i, v)}
                               onSendMessage={(text) => handleSendMessage(text, [], selectedModel)}
                             />
-                          ) : null}
-                        </div>
-                      ) : (
-                         <MessageBubble
-                            content={msg.content}
-                            role={msg.role}
-                            versions={msg.versions}
-                            currentVersion={msg.currentVersion || 0}
-                            onVersionChange={(v) => handleVersionChange(i, v)}
-                            onSendMessage={(text) => handleSendMessage(text, [], selectedModel)}
-                          />
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  {!editingIndex && (
-                    <MessageActions
-                      role={msg.role}
-                      isLast={isLastAssistant}
-                      isLoading={isLoading}
-                      onRegenerate={handleRegenerate}
-                      onEdit={() => handleEdit(i)}
-                      onCopy={() => handleCopy(msg.content, i)}
-                      isCopied={copiedIndex === i}
-                      versions={msg.versions}
-                      currentVersion={msg.currentVersion || 0}
-                      onVersionChange={(v) => handleVersionChange(i, v)}
-                    />
+                    {!editingIndex && (
+                      <MessageActions
+                        role={msg.role}
+                        isLast={isLastAssistant}
+                        isLoading={isLoading}
+                        onRegenerate={handleRegenerate}
+                        onEdit={() => handleEdit(i)}
+                        onCopy={() => handleCopy(msg.content, i)}
+                        isCopied={copiedIndex === i}
+                        versions={msg.versions}
+                        currentVersion={msg.currentVersion || 0}
+                        onVersionChange={(v) => handleVersionChange(i, v)}
+                      />
+                    )}
+                  </motion.div>
+                  {/* Exchange divider — rendered after each assistant reply, except the last */}
+                  {isEndOfExchange && (
+                    <div className="flex items-center gap-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity" style={{ opacity: 0.35 }}>
+                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+                      <div className="text-[10px] text-white/30 font-mono tracking-widest uppercase select-none">
+                        {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+                    </div>
                   )}
-                </motion.div>
+                </React.Fragment>
               );
             })}
             {isLoading && !currentResponse && loadingState && (

@@ -923,7 +923,12 @@ export const MessageBubble = ({ content, role, versions, currentVersion, onVersi
   const { thinking, webSearch, canvas, videos, knowledgeGraph, answer } = parseReasoningResponse(content);
   const downloads = parseDownloadBlocks(answer);
   const isGeneratingFile = answer.includes('[FILE_GENERATING]') && downloads.length === 0;
-  const cleanedAnswer = answer.replace(/\[FILE_GENERATING\]/g, '').replace(/\[(?:[A-Z_]*)?DOWNLOAD:\s*\{[\s\S]*?\}\s*\]/gi, '').replace(/\[(?:[A-Z_]+)?DOWNLOAD:[^\]]+\]/gi, '').trim();
+  let cleanedAnswer = answer.replace(/\[FILE_GENERATING\]/g, '').replace(/\[(?:[A-Z_]*)?DOWNLOAD:\s*\{[\s\S]*?\}\s*\]/gi, '').replace(/\[(?:[A-Z_]+)?DOWNLOAD:[^\]]+\]/gi, '').trim();
+  
+  // Pre-process math blocks because AI often outputs \[ \] or \( \) instead of $$ and $
+  cleanedAnswer = cleanedAnswer
+    .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$')
+    .replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$');
 
   const handleCopyCode = (code, index) => {
     navigator.clipboard.writeText(code);
